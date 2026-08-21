@@ -111,6 +111,8 @@ export async function syncPendingData() {
     }
     localStorage.setItem("dukandar_offline_queue", JSON.stringify(remaining));
 
+    if (synced > 0) clearGetCache();
+
     console.log(`[Dukandar Sync] Complete — synced: ${synced}, failed: ${failed}`);
     return { synced, failed };
 }
@@ -197,6 +199,11 @@ async function apiCall(action, data = {}) {
 
         if (!parsed.success) {
             console.error(`[Dukandar POST] Backend error for "${action}":`, parsed.error || parsed.message);
+        } else {
+            // Any successful write can change what a GET would return (stock, balances,
+            // totals, etc.) — drop all cached reads rather than trying to track exactly
+            // which ones this action could have affected.
+            clearGetCache();
         }
 
         return parsed;
@@ -210,8 +217,40 @@ async function apiCall(action, data = {}) {
 
 // ─────────────────────────────────────────────
 // BASE GET
+// Short-lived in-memory cache: switching between pages (Dashboard/Orders/Products/...)
+// re-requests the same lists over and over, and every request pays the Apps Script Web
+// App's own latency (cold start + full sheet read). A repeat read within CACHE_TTL_MS
+// reuses the last response instead of hitting the network again. Any write (apiCall)
+// clears the whole cache so a save/delete is never masked by stale cached data.
 // ─────────────────────────────────────────────
+const CACHE_TTL_MS = 30000;
+const getCache = new Map(); // cacheKey -> { time, promise }
+
+function cacheKeyFor(action, params) {
+    return action + "?" + JSON.stringify(params, Object.keys(params).sort());
+}
+
+function clearGetCache() {
+    getCache.clear();
+}
+
 async function apiGet(action, params = {}) {
+    const key = cacheKeyFor(action, params);
+    const cached = getCache.get(key);
+    if (cached && (Date.now() - cached.time) < CACHE_TTL_MS) {
+        return cached.promise;
+    }
+
+    const promise = apiGetUncached(action, params);
+    getCache.set(key, { time: Date.now(), promise });
+
+    const result = await promise;
+    // Don't keep a failed/offline response cached — let the next call retry the network.
+    if (!result || result.success === false) getCache.delete(key);
+    return result;
+}
+
+async function apiGetUncached(action, params) {
     const url = new URL(SCRIPT_URL);
     url.searchParams.set("action", action);
     Object.entries(params).forEach(([k, v]) => {

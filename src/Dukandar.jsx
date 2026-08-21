@@ -40,6 +40,50 @@ const AppContext = createContext(null);
 function useApp() { return useContext(AppContext); }
 
 // ─────────────────────────────────────────────
+// TOAST NOTIFICATIONS
+// Module-level pub/sub so any component can call toast(...) directly,
+// the same way it would call the browser's alert(...), without prop drilling or context.
+// ─────────────────────────────────────────────
+let toastListeners = [];
+let toastIdSeq = 0;
+function toast(message, type = "error") {
+    const id = ++toastIdSeq;
+    toastListeners.forEach(fn => fn({ id, message, type }));
+    return id;
+}
+function ToastHost() {
+    const [toasts, setToasts] = useState([]);
+    useEffect(() => {
+        const onToast = (t) => {
+            setToasts(prev => [...prev, t]);
+            setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), 5000);
+        };
+        toastListeners.push(onToast);
+        return () => { toastListeners = toastListeners.filter(fn => fn !== onToast); };
+    }, []);
+    if (!toasts.length) return null;
+    const colors = {
+        error:   { bg: "#450a0a", border: "#ef4444", fg: "#fca5a5" },
+        success: { bg: "#052e16", border: "#16a34a", fg: "#86efac" },
+        info:    { bg: "#1e293b", border: "#334155", fg: "#cbd5e1" },
+    };
+    return (
+        <div style={{ position: "fixed", top: 16, right: 16, zIndex: 99999, display: "flex", flexDirection: "column", gap: 8, maxWidth: 380 }}>
+            {toasts.map(t => {
+                const c = colors[t.type] || colors.error;
+                return (
+                    <div key={t.id} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px", color: c.fg, fontSize: 13, boxShadow: "0 8px 24px #00000055", display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <span style={{ flex: 1, wordBreak: "break-word" }}>{t.message}</span>
+                        <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+                            style={{ background: "none", border: "none", color: c.fg, cursor: "pointer", opacity: 0.7, fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
 // ICONS
 // ─────────────────────────────────────────────
 const Icon = ({ name, size = 18, className = "" }) => {
@@ -112,8 +156,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // ─────────────────────────────────────────────
 // UTILITIES
 // ─────────────────────────────────────────────
-const fmt = (n) => "Rs " + Number(n || 0).toLocaleString("en-PK");
-const fmtNum = (n) => Number(n || 0).toLocaleString("en-PK");
+const safeNum = (n) => { const v = Number(n); return Number.isFinite(v) ? v : 0; };
+const fmt = (n) => "Rs " + safeNum(n).toLocaleString("en-PK");
+const fmtNum = (n) => safeNum(n).toLocaleString("en-PK");
 // Use local (device) date/time, not UTC — the backend records dates in Asia/Karachi
 // time, and toISOString() would show "yesterday" for hours 00:00-04:59 Karachi time.
 const today = () => {
@@ -121,7 +166,6 @@ const today = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const thisMonth = () => today().slice(0, 7);
-const PAYMENT_METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
 
 // ─────────────────────────────────────────────
 // PAYMENT METHODS CONFIGURATION
@@ -141,16 +185,30 @@ function getPaymentMethodsConfig() {
 
 function savePaymentMethodsConfig(list) {
     localStorage.setItem("dukandar_payment_methods", JSON.stringify(list));
+    window.dispatchEvent(new Event("dukandar_payment_methods_changed"));
 }
 
-function getLocalSalesmen() {
-    try {
-        const d = localStorage.getItem("dukandar_salesmen");
-        return d ? JSON.parse(d) : [
-            { id: "SM001", name: "Ahmed Ali", phone: "0300-1234567", commissionRate: 2, salary: 15000 },
-            { id: "SM002", name: "Bilal Khan", phone: "0311-9876543", commissionRate: 3, salary: 18000 },
-        ];
-    } catch { return []; }
+// Single source of truth for payment method names, used by every screen that
+// takes or displays a payment (Bill Receipt, Order Detail, Orders/POS, Expenses,
+// Accounts) so editing Settings → Payment Methods propagates everywhere at once.
+function getPaymentMethodNames() {
+    return getPaymentMethodsConfig().map(m => m.name);
+}
+
+// Re-reads the payment method list whenever it changes (including in another tab),
+// so open screens stay in sync with Settings → Payment Methods.
+function usePaymentMethodNames() {
+    const [names, setNames] = useState(getPaymentMethodNames());
+    useEffect(() => {
+        const refresh = () => setNames(getPaymentMethodNames());
+        window.addEventListener("dukandar_payment_methods_changed", refresh);
+        window.addEventListener("storage", refresh);
+        return () => {
+            window.removeEventListener("dukandar_payment_methods_changed", refresh);
+            window.removeEventListener("storage", refresh);
+        };
+    }, []);
+    return names;
 }
 
 function Spinner() {
@@ -301,15 +359,10 @@ function LoginPage({ onLogin }) {
                 return;
             }
         } catch {
-            // network/exception — fall through to offline fallback
+            // network/exception — backend unreachable
         }
-        // Offline fallback: only reached when the backend was unreachable.
-        await new Promise(r => setTimeout(r, 600));
-        if (form.username === "admin" && form.password === "123admin") {
-            onLogin({ username: "admin", role: "Admin", name: "Admin User" });
-        } else if (form.username === "manager" && form.password === "manager123") {
-            onLogin({ username: "manager", role: "Manager", name: "Store Manager" });
-        } else { setError("Invalid username or password."); setLoading(false); }
+        setError("Could not reach the server. Please check your connection and try again.");
+        setLoading(false);
     };
 
     return (
@@ -343,9 +396,6 @@ function LoginPage({ onLogin }) {
                         style={{ width: "100%", background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", border: "none", borderRadius: 8, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                         {loading ? "Signing in…" : "Sign In"}
                     </button>
-                    <div style={{ marginTop: 16, padding: "12px", background: "#0f172a", borderRadius: 8, fontSize: 12, color: "#64748b" }}>
-                        <strong style={{ color: "#94a3b8" }}>Demo:</strong> admin / 123admin &nbsp;|&nbsp; manager / manager123
-                    </div>
                 </div>
             </div>
         </div>
@@ -552,7 +602,8 @@ function Table({ columns, data, onEdit, onDelete, onView }) {
 // UNIFIED MULTI-PAYMENT INPUT
 // ─────────────────────────────────────────────
 function MultiPaymentInput({ payments, onChange, maxTotal, label = "Payments", methods, remainingLabel = "Remaining (auto due)", dueLabel = "Auto Due (Credit)" }) {
-    const METHODS = (methods && methods.length) ? methods : ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const defaultMethods = usePaymentMethodNames();
+    const METHODS = (methods && methods.length) ? methods : defaultMethods;
     const total = METHODS.reduce((s, m) => s + (parseFloat(payments[m]) || 0), 0);
     const remaining = maxTotal !== undefined ? Math.max(0, maxTotal - total) : null;
     const overLimit = maxTotal !== undefined && total > maxTotal;
@@ -608,7 +659,7 @@ function MultiPaymentInput({ payments, onChange, maxTotal, label = "Payments", m
 function BillReceiptModal({ order, onClose }) {
     const items = (() => { try { return typeof order.items === "string" ? JSON.parse(order.items) : (order.items || order.cart || []); } catch { return order.cart || []; } })();
     const payments = (() => { try { return typeof order.payments === "string" ? JSON.parse(order.payments) : (order.payments || {}); } catch { return {}; } })();
-    const METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const METHODS = getPaymentMethodNames();
     const totalPaid = METHODS.reduce((s, m) => s + (parseFloat(payments[m]) || 0), 0);
     const due = Number(order.total || 0) - totalPaid;
     const storeName = localStorage.getItem("dukandar_store_name") || "Dukandar Store";
@@ -948,8 +999,8 @@ function ProductsPage() {
         try {
             const result = editItem ? await updateProduct(editItem.id, form) : await addProduct(form);
             if (result.success) { await fetchProds(); setShowForm(false); if (!editItem && result.id) setAutoShowQRForId(result.id); }
-            else alert(result.error || "Failed to save product.");
-        } catch { alert("Network or server error."); }
+            else toast(result.error || "Failed to save product.");
+        } catch { toast("Network or server error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -958,8 +1009,8 @@ function ProductsPage() {
         try {
             const result = await deleteProduct(row.id);
             if (result.success) await fetchProds();
-            else alert(result.error || "Failed to delete.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to delete.");
+        } catch { toast("Network error."); }
     }
 
     return (
@@ -1061,8 +1112,8 @@ function CustomersPage() {
         try {
             const result = editItem ? await updateCustomer(editItem.id, form) : await addCustomer(form);
             if (result.success) { await fetchCusts(); setShowForm(false); }
-            else alert(result.error || "Failed to save customer.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to save customer.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -1071,9 +1122,9 @@ function CustomersPage() {
         try {
             const result = await deleteCustomer(row.id);
             if (result.success) await fetchCusts();
-            else if (String(result.error || "").includes("Unknown")) alert("Customer delete needs the updated backend. Please re-deploy the Google Apps Script (see REDEPLOY.md).");
-            else alert(result.error || "Failed to delete.");
-        } catch { alert("Network error."); }
+            else if (String(result.error || "").includes("Unknown")) toast("Customer delete needs the updated backend. Please re-deploy the Google Apps Script (see REDEPLOY.md).");
+            else toast(result.error || "Failed to delete.");
+        } catch { toast("Network error."); }
     }
 
     return (
@@ -1117,7 +1168,7 @@ function CustomersPage() {
 // ─────────────────────────────────────────────
 function OrderDetailModal({ order, onClose, onPaymentAdded }) {
     const [showPayForm, setShowPayForm] = useState(false);
-    const [newPayments, setNewPayments] = useState({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
+    const [newPayments, setNewPayments] = useState(() => Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])));
     const [saving, setSaving] = useState(false);
     const [showBill, setShowBill] = useState(false);
     const [stitchStatus, setStitchStatus] = useState(order.stitchStatus || "none");
@@ -1125,7 +1176,7 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
 
     const items = (() => { try { return typeof order.items === "string" ? JSON.parse(order.items) : (order.items || order.cart || []); } catch { return order.cart || []; } })();
     const payments = (() => { try { return typeof order.payments === "string" ? JSON.parse(order.payments) : (order.payments || {}); } catch { return {}; } })();
-    const METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const METHODS = getPaymentMethodNames();
     const due = Number(order.total || 0) - Number(order.paid || 0);
     const newPayTotal = METHODS.reduce((s, m) => s + (parseFloat(newPayments[m]) || 0), 0);
 
@@ -1137,13 +1188,13 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
                 const amt = parseFloat(amtStr) || 0;
                 if (amt > 0) {
                     const result = await updateOrder(order.id, { newPaymentAmount: amt, newPaymentMethod: method });
-                    if (!result.success) { alert(`Failed to record payment via ${method}`); setSaving(false); return; }
+                    if (!result.success) { toast(`Failed to record payment via ${method}`); setSaving(false); return; }
                 }
             }
             setShowPayForm(false);
             setNewPayments({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
             onPaymentAdded();
-        } catch { alert("Network error."); }
+        } catch { toast("Network error."); }
         finally { setSaving(false); }
     }
 
@@ -1152,8 +1203,8 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
         try {
             const result = await updateOrderStitchStatus({ orderId: order.id, status: newStatus });
             if (result.success) { setStitchStatus(newStatus); onPaymentAdded(); }
-            else alert(result.error || "Failed to update stitch status.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to update stitch status.");
+        } catch { toast("Network error."); }
         finally { setUpdatingStitch(false); }
     }
 
@@ -1280,8 +1331,8 @@ function QuickAddCustomerModal({ onClose, onAdded }) {
         try {
             const res = await addCustomer(form);
             if (res.success) { onAdded({ ...form, id: res.id || "new" }); onClose(); }
-            else alert(res.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(res.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { setSaving(false); }
     }
 
@@ -1319,7 +1370,7 @@ function OrdersPage() {
     const [selectedCustomer, setSelectedCustomer] = useState("Walk-in Customer");
     const [selectedCustomerObj, setSelectedCustomerObj] = useState(null);
     const [selectedSalesman, setSelectedSalesman] = useState("");
-    const [payments, setPayments] = useState({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
+    const [payments, setPayments] = useState(() => Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])));
     const [discount, setDiscount] = useState(0);
     const [productSearch, setProductSearch] = useState("");
     const [showInvoice, setShowInvoice] = useState(false);
@@ -1350,7 +1401,7 @@ function OrdersPage() {
             if (pRes.success) setAllProducts(pRes.products || []);
             if (cRes.success) setAllCustomers(cRes.customers || []);
             if (sRes.success) setAllSalesmen(sRes.salesmen || []);
-            else setAllSalesmen(getLocalSalesmen());
+            else { setAllSalesmen([]); console.error("getSalesmen failed — salesman list unavailable:", sRes.error); }
             if (stRes.success) setAllStitchers((stRes.stitchers || []).filter(s => s.status === "active"));
         } catch (err) { console.error(err); }
         finally { if (mountedRef.current) setLoading(false); }
@@ -1367,7 +1418,7 @@ function OrdersPage() {
     const subtotal = cart.reduce((s, i) => s + i.qty * i.price, 0);
     const discountAmt = Math.round(subtotal * discount / 100);
     const total = subtotal - discountAmt + parseFloat(clientStitchingCharge || 0);
-    const METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const METHODS = getPaymentMethodNames();
     const totalPaid = METHODS.reduce((s, m) => s + (parseFloat(payments[m]) || 0), 0);
     const due = total - totalPaid;
     const creditDue = due > 0 ? due : 0;
@@ -1375,7 +1426,9 @@ function OrdersPage() {
     const custCreditLimit = Number(selectedCustomerObj?.creditLimit || 0);
     const custExistingDue = selectedCustomerObj ? Math.abs(Math.min(0, Number(selectedCustomerObj.balance || 0))) : 0;
     const creditLimitExceeded = custCreditLimit > 0 && (custExistingDue + creditDue) > custCreditLimit;
-    const canSave = (cart.length > 0 || parseFloat(clientStitchingCharge) > 0) && !saving && !paidOverTotal && !creditLimitExceeded;
+    const stockExceededItems = cart.filter(i => Number(i.stock) >= 0 && i.qty > Number(i.stock));
+    const stockExceeded = stockExceededItems.length > 0 && !isEditMode;
+    const canSave = (cart.length > 0 || parseFloat(clientStitchingCharge) > 0) && !saving && !paidOverTotal && !creditLimitExceeded && !stockExceeded;
 
     const filteredOrders = orders.filter(o => {
         const d = String(o.date).trim();
@@ -1507,7 +1560,7 @@ function OrdersPage() {
 
             if (!res.success) {
                 if (res.creditLimitExceeded) setCreditLimitErr(res.error);
-                else alert(res.error || "Failed to save order.");
+                else toast(res.error || "Failed to save order.");
                 setSaving(false);
                 return;
             }
@@ -1527,7 +1580,7 @@ function OrdersPage() {
             setIsEditMode(false);
             setEditOrderId(null);
             await fetchAll();
-        } catch { alert("Network or server error."); }
+        } catch { toast("Network or server error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -1552,7 +1605,7 @@ function OrdersPage() {
     // the row "cancelled" (updateOrderFull itself would force it back to paid/credit). The
     // record stays in the list for history — nothing is hard-deleted.
     async function voidOrder(order) {
-        if (order.status === "cancelled") { alert("This order is already cancelled."); return; }
+        if (order.status === "cancelled") { toast("This order is already cancelled."); return; }
         if (!window.confirm(
             `Void order ${order.id}?\n\nThis reverses its stock, payments, customer balance, salesman commission and stitcher earnings. The order stays in the list marked "Cancelled". This cannot be undone.`
         )) return;
@@ -1565,11 +1618,11 @@ function OrdersPage() {
                 clientStitchingCharge: 0, stitcherPay: 0,
                 items: [], payments: {}, discount: 0, total: 0, paid: 0,
             });
-            if (!res.success) { alert(res.error || "Failed to void order."); return; }
+            if (!res.success) { toast(res.error || "Failed to void order."); return; }
             const statusRes = await updateOrder(order.id, { status: "cancelled" });
-            if (!statusRes.success) alert("Order reversed, but marking it Cancelled failed: " + (statusRes.error || ""));
+            if (!statusRes.success) toast("Order reversed, but marking it Cancelled failed: " + (statusRes.error || ""));
             await fetchAll();
-        } catch { alert("Network error while voiding order."); }
+        } catch { toast("Network error while voiding order."); }
     }
 
     const filteredProducts = allProducts.filter(p => productSearch && (p.name?.toLowerCase().includes(productSearch.toLowerCase()) || String(p.barcode ?? "").includes(productSearch)));
@@ -1613,12 +1666,12 @@ function OrdersPage() {
                             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                                 <div>
                                     <label style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500, display: "block", marginBottom: 5 }}>Client Stitching Charge (to customer)</label>
-                                    <input type="number" value={clientStitchingCharge} onChange={e => setClientStitchingCharge(e.target.value)} min="0" placeholder="Rs"
+                                    <input type="number" value={clientStitchingCharge} onChange={e => { const v = e.target.value; if (v === "" || parseFloat(v) >= 0) setClientStitchingCharge(v); }} min="0" placeholder="Rs"
                                         style={{ width: "100%", background: "#0f172a", border: "1px solid #60a5fa44", borderRadius: 8, padding: "9px 12px", color: "#60a5fa", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                                 </div>
                                 <div>
                                     <label style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500, display: "block", marginBottom: 5 }}>Stitcher Pay (company expense)</label>
-                                    <input type="number" value={stitcherPay} onChange={e => setStitcherPay(e.target.value)} min="0" placeholder="Rs"
+                                    <input type="number" value={stitcherPay} onChange={e => { const v = e.target.value; if (v === "" || parseFloat(v) >= 0) setStitcherPay(v); }} min="0" placeholder="Rs"
                                         style={{ width: "100%", background: "#0f172a", border: "1px solid #c084fc44", borderRadius: 8, padding: "9px 12px", color: "#c084fc", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                                 </div>
                             </div>
@@ -1665,15 +1718,17 @@ function OrdersPage() {
                                         <tbody>{cart.map(item => {
                                             const lineTotal = item.qty * item.price;
                                             const salesmanOpts = [{ value: "", label: "—" }, ...allSalesmen.map(s => ({ value: s.id || s.name, label: `${s.name} (${s.commissionRate}%)` }))];
+                                            const overStock = !isEditMode && Number(item.stock) >= 0 && item.qty > Number(item.stock);
                                             return (
                                                 <tr key={item.id} style={{ borderBottom: "1px solid #1e293b" }}>
                                                     <td style={{ padding: "8px 10px", color: "#f1f5f9" }}>{item.name}</td>
                                                     <td style={{ padding: "8px 10px" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                             <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer" }}>-</button>
-                                                            <span style={{ color: "#f1f5f9", minWidth: 20, textAlign: "center" }}>{item.qty}</span>
+                                                            <span style={{ color: overStock ? "#f87171" : "#f1f5f9", minWidth: 20, textAlign: "center", fontWeight: overStock ? 700 : 400 }}>{item.qty}</span>
                                                             <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer" }}>+</button>
                                                         </div>
+                                                        {overStock && <div style={{ color: "#f87171", fontSize: 10, marginTop: 2, whiteSpace: "nowrap" }}>Only {item.stock} in stock</div>}
                                                     </td>
                                                     <td style={{ padding: "8px 10px" }}>
                                                         <input type="number" value={item.price} onChange={e => updatePrice(item.id, e.target.value)} style={{ width: 70, background: "#0f172a", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: "#f1f5f9", fontSize: 12 }} />
@@ -1712,7 +1767,7 @@ function OrdersPage() {
                         <h3 style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14, marginBottom: 14, fontFamily: "'Syne',sans-serif" }}>Payment {isEditMode && <span style={{ color: "#fbbf24", fontSize: 12 }}>(editing)</span>}</h3>
                         <div style={{ marginBottom: 12 }}>
                             <label style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500, display: "block", marginBottom: 5 }}>Discount %</label>
-                            <input type="number" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                            <input type="number" value={discount} min="0" max="100" onChange={e => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
                                 style={{ width: "100%", background: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "9px 12px", color: "#f1f5f9", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                         </div>
                         <MultiPaymentInput payments={payments} onChange={setPayments} maxTotal={total} label="Payment (remaining = auto credit due)" />
@@ -1742,11 +1797,17 @@ function OrdersPage() {
                             Credit limit exceeded for this customer.
                         </div>
                     )}
+                    {stockExceeded && (
+                        <div style={{ background: "#450a0a22", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", marginBottom: 12, color: "#f87171", fontSize: 13 }}>
+                            {stockExceededItems.map(i => i.name).join(", ")} — quantity exceeds available stock.
+                        </div>
+                    )}
                     {creditLimitErr && <div style={{ background: "#450a0a22", border: "1px solid #ef4444", borderRadius: 8, padding: "10px 14px", marginBottom: 12, color: "#f87171", fontSize: 12 }}>{creditLimitErr}</div>}
                     <Btn onClick={saveOrder} size="lg" disabled={!canSave} style={{ width: "100%", justifyContent: "center" }}>
                         {saving ? "Saving…" :
                          paidOverTotal ? "Paid Exceeds Total" :
                          creditLimitExceeded ? "Credit Limit Exceeded" :
+                         stockExceeded ? "Insufficient Stock" :
                          isEditMode ? "Update Order" : "Save Order"}
                     </Btn>
                     {isEditMode && <Btn variant="ghost" size="sm" onClick={cancelEdit} style={{ width: "100%", marginTop: 8, justifyContent: "center" }}>Cancel Edit</Btn>}
@@ -1837,8 +1898,8 @@ function SuppliersPage() {
         try {
             const result = editItem ? await updateSupplier(editItem.id, form) : await addSupplier(form);
             if (result.success) { await fetchSups(); setShowForm(false); setForm(blank); setEditItem(null); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     async function del(row) {
@@ -1846,8 +1907,8 @@ function SuppliersPage() {
         try {
             const result = await deleteSupplier(row.id);
             if (result.success) await fetchSups();
-            else alert(result.error || "Failed to delete.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to delete.");
+        } catch { toast("Network error."); }
     }
     return (
         <div style={{ padding: 24 }}>
@@ -1940,8 +2001,8 @@ function InventoryPage() {
             const payload = { supplierId: form.supplierId, supplier: form.supplier, items: [{ productId: form.productId, productName: form.product, qty: Number(form.qty), purchasePrice: Number(form.purchasePrice) }], payments, total };
             const result = editItem ? await updateInventory(editItem.id, payload) : await addInventory(payload);
             if (result.success) { await fetchAll(); setShowForm(false); setForm(blank); setEditItem(null); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     async function del(row) {
@@ -1949,11 +2010,11 @@ function InventoryPage() {
         try {
             const result = await deleteInventory(row.id);
             if (result.success) await fetchAll();
-            else alert(result.error || "Failed to delete.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to delete.");
+        } catch { toast("Network error."); }
     }
     function openEdit(row) {
-        if (!canEdit(row)) { alert("This purchase has multiple products or split payments and can't be edited here — delete and re-add it instead."); return; }
+        if (!canEdit(row)) { toast("This purchase has multiple products or split payments and can't be edited here — delete and re-add it instead."); return; }
         const items = parseInventoryItems(row.items);
         const item = items[0] || {};
         const methods = Object.entries(parsePaymentsMap(row.payments)).filter(([, amt]) => Number(amt) > 0);
@@ -1999,7 +2060,7 @@ function InventoryPage() {
                             options={[{ value: "", label: "Select Product" }, ...allProducts.map(p => ({ value: p.id, label: p.name }))]} />
                         <Input label="Quantity" type="number" min="0" value={form.qty} onChange={f("qty")} />
                         <Input label="Purchase Price" type="number" min="0" value={form.purchasePrice} onChange={f("purchasePrice")} />
-                        <Select label="Payment Method" value={form.payment} onChange={f("payment")} options={["Cash", "Bank Account", "EasyPaisa", "JazzCash", "Credit"]} />
+                        <Select label="Payment Method" value={form.payment} onChange={f("payment")} options={[...getPaymentMethodNames(), "Credit"]} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
                         <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancel</Btn>
@@ -2022,7 +2083,7 @@ function ExpensesPage() {
     const [editItem, setEditItem] = useState(null);
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const blank = { category: "Rent", amount: "", payments: { Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" }, note: "" };
+    const blank = { category: "Rent", amount: "", payments: Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])), note: "" };
     const [form, setForm] = useState(blank);
     const mountedRef = useRef(true);
     useEffect(() => { mountedRef.current = true; fetchExp(); return () => { mountedRef.current = false; }; }, []);
@@ -2033,7 +2094,7 @@ function ExpensesPage() {
         finally { if (mountedRef.current) setLoading(false); }
     }
     const f = k => e => setForm({ ...form, [k]: e.target.value });
-    const METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const METHODS = getPaymentMethodNames();
     const payTotal = METHODS.reduce((s, m) => s + (parseFloat(form.payments[m]) || 0), 0);
     const filtered = expenses.filter(e => {
         const d = String(e.date).trim();
@@ -2048,8 +2109,8 @@ function ExpensesPage() {
             const payload = { ...form, amount: parseFloat(amount) || payTotal, date: editItem ? (editItem.date || today()) : today() };
             const result = editItem ? await updateExpense(editItem.id, payload) : await addExpense(payload);
             if (result.success) { await fetchExp(); setShowForm(false); setForm(blank); setEditItem(null); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     async function del(row) {
@@ -2057,8 +2118,8 @@ function ExpensesPage() {
         try {
             const result = await deleteExpense(row.id);
             if (result.success) await fetchExp();
-            else alert(result.error || "Failed to delete.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to delete.");
+        } catch { toast("Network error."); }
     }
     const parsePayments = (v) => {
         try { return typeof v === "string" ? (v.startsWith("{") ? JSON.parse(v) : { [v]: null }) : v; } catch { return {}; }
@@ -2145,7 +2206,7 @@ function SalesmenPage() {
         try {
             const [smRes, oRes] = await Promise.all([getSalesmen(), getOrders()]);
             if (!mountedRef.current) return;
-            if (smRes.success) setSalesmen(smRes.salesmen || []); else setSalesmen(getLocalSalesmen());
+            if (smRes.success) setSalesmen(smRes.salesmen || []); else { setSalesmen([]); console.error("getSalesmen failed — salesman list unavailable:", smRes.error); }
             if (oRes.success) setOrders(oRes.orders || []);
         } catch (err) { console.error(err); }
         finally { if (mountedRef.current) setLoading(false); }
@@ -2159,8 +2220,8 @@ function SalesmenPage() {
         try {
             const result = editItem ? await updateSalesman(editItem.id, form) : await addSalesman(form);
             if (result.success) { await fetchAll(); setShowForm(false); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -2169,18 +2230,18 @@ function SalesmenPage() {
         try {
             const result = await deleteSalesman(row.id);
             if (result.success) await fetchAll();
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
     }
 
     async function payNow() {
-        if (!showPayModal || !payForm.amount) return;
+        if (!showPayModal || !(parseFloat(payForm.amount) > 0)) return;
         setSaving(true);
         try {
             const result = await addSalesmanPayment({ salesmanId: showPayModal.id, salesmanName: showPayModal.name, ...payForm, amount: parseFloat(payForm.amount) });
             if (result.success) { await fetchAll(); setShowPayModal(null); setPayForm(payBlank); }
-            else alert(result.error || "Payment failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Payment failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -2276,7 +2337,7 @@ function SalesmenPage() {
                         <Select label="Payment Type" value={payForm.type} onChange={e => setPayForm({ ...payForm, type: e.target.value })} options={[{ value: "salary", label: "Salary" }, { value: "commission", label: "Commission" }, { value: "bonus", label: "Bonus" }, { value: "advance", label: "Advance" }]} />
                         <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
                         <Input label="Month" type="month" value={payForm.month} onChange={e => setPayForm({ ...payForm, month: e.target.value })} />
-                        <Select label="Payment Method" value={payForm.paymentMethod} onChange={e => setPayForm({ ...payForm, paymentMethod: e.target.value })} options={["Cash", "Bank Account", "JazzCash", "EasyPaisa"]} />
+                        <Select label="Payment Method" value={payForm.paymentMethod} onChange={e => setPayForm({ ...payForm, paymentMethod: e.target.value })} options={getPaymentMethodNames()} />
                         <Input label="Note" value={payForm.note} onChange={e => setPayForm({ ...payForm, note: e.target.value })} style={{ gridColumn: "1/-1" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -2349,8 +2410,8 @@ function StitchersPage() {
         try {
             const result = editItem ? await updateStitcher(editItem.id, form) : await addStitcher(form);
             if (result.success) { await fetchAll(); setShowForm(false); }
-            else alert(result.error || "Failed to save stitcher.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed to save stitcher.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -2359,18 +2420,18 @@ function StitchersPage() {
         try {
             const result = await deleteStitcher(row.id);
             if (result.success) await fetchAll();
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
     }
 
     async function payNow() {
-        if (!showPayModal || !payForm.amount) return;
+        if (!showPayModal || !(parseFloat(payForm.amount) > 0)) return;
         setSaving(true);
         try {
             const result = await addStitcherPayment({ stitcherId: showPayModal.id, stitcherName: showPayModal.name, type: "payment", ...payForm, amount: parseFloat(payForm.amount) });
             if (result.success) { await fetchAll(); setShowPayModal(null); setPayForm({ amount: "", month: thisMonth(), note: "", paymentMethod: "Cash" }); }
-            else alert(result.error || "Payment failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Payment failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -2568,7 +2629,7 @@ function StitchersPage() {
                         <Input label="City" value={form.city} onChange={f("city")} />
                         <Input label="Joining Date" type="date" value={form.joiningDate} onChange={f("joiningDate")} />
                         <Select label="Status" value={form.status} onChange={f("status")} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
-                        <Select label="Payment Method" value={form.paymentMethod} onChange={f("paymentMethod")} options={["Cash", "Bank Account", "JazzCash", "EasyPaisa"]} />
+                        <Select label="Payment Method" value={form.paymentMethod} onChange={f("paymentMethod")} options={getPaymentMethodNames()} />
                         <Input label="Notes" value={form.notes} onChange={f("notes")} style={{ gridColumn: "1/-1" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -2632,7 +2693,7 @@ function StitchersPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
                         <Input label="Month" type="month" value={payForm.month} onChange={e => setPayForm({ ...payForm, month: e.target.value })} />
-                        <Select label="Payment Method" value={payForm.paymentMethod} onChange={e => setPayForm({ ...payForm, paymentMethod: e.target.value })} options={["Cash", "Bank Account", "JazzCash", "EasyPaisa"]} />
+                        <Select label="Payment Method" value={payForm.paymentMethod} onChange={e => setPayForm({ ...payForm, paymentMethod: e.target.value })} options={getPaymentMethodNames()} />
                         <Input label="Note" value={payForm.note} onChange={e => setPayForm({ ...payForm, note: e.target.value })} style={{ gridColumn: "1/-1" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -2719,8 +2780,8 @@ function AssetsPage() {
         try {
             const result = editItem ? await updateAsset(editItem.id, form) : await addAsset(form);
             if (result.success) { await fetchAssets(); setShowForm(false); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     async function del(row) {
@@ -2728,8 +2789,8 @@ function AssetsPage() {
         try {
             const result = await deleteAsset(row.id);
             if (result.success) await fetchAssets();
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
     }
     async function saveMaint() {
         if (!showMaintForm || !mForm.type) return;
@@ -2737,8 +2798,8 @@ function AssetsPage() {
         try {
             const result = await addAssetMaintenance({ assetId: showMaintForm.id, assetName: showMaintForm.name, ...mForm });
             if (result.success) { await fetchAssets(); setShowMaintForm(null); setMForm(mBlank); }
-            else alert(result.error || "Failed.");
-        } catch { alert("Network error."); }
+            else toast(result.error || "Failed.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     const totalValue = assets.reduce((s, a) => s + Number(a.currentValue || a.purchasePrice || 0), 0);
@@ -2834,7 +2895,7 @@ function AssetsPage() {
                         <Select label="Type" value={mForm.type} onChange={mf("type")} options={["Repair", "Service", "Inspection", "Replacement", "Upgrade"]} />
                         <Input label="Cost (Rs)" type="number" value={mForm.cost} onChange={mf("cost")} />
                         <Input label="Vendor" value={mForm.vendor} onChange={mf("vendor")} />
-                        <Select label="Payment Method" value={mForm.paymentMethod} onChange={mf("paymentMethod")} options={["Cash", "Bank Account", "JazzCash", "EasyPaisa"]} />
+                        <Select label="Payment Method" value={mForm.paymentMethod} onChange={mf("paymentMethod")} options={getPaymentMethodNames()} />
                         <Input label="Date" type="date" value={mForm.date} onChange={mf("date")} />
                         <Input label="Next Due Date" type="date" value={mForm.nextDue} onChange={mf("nextDue")} />
                         <Input label="Notes" value={mForm.notes} onChange={mf("notes")} style={{ gridColumn: "1/-1" }} />
@@ -2875,7 +2936,7 @@ function ReportsPage() {
             if (oRes.success) setOrders(oRes.orders || []);
             if (pRes.success) setProducts(pRes.products || []);
             if (cRes.success) setCustomers(cRes.customers || []);
-            if (sRes.success) setSalesmen(sRes.salesmen || []); else setSalesmen(getLocalSalesmen());
+            if (sRes.success) setSalesmen(sRes.salesmen || []); else { setSalesmen([]); console.error("getSalesmen failed — salesman list unavailable:", sRes.error); }
             if (eRes.success) setExpenses(eRes.expenses || []);
             if (stRes.success) setStitchers(stRes.stitchers || []);
         } catch (err) { console.error(err); }
@@ -3160,7 +3221,7 @@ function AccountsPage() {
     const creditReceivable = filteredOrders.filter(o => o.status === "credit").reduce((s, o) => s + Math.max(0, Number(o.total || 0) - Number(o.paid || 0)), 0);
     const totalExpenses = filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
-    const METHODS = ["Cash", "Bank Account", "EasyPaisa", "JazzCash"];
+    const METHODS = getPaymentMethodNames();
 
     function getMethodInflow(method) {
         return filteredOrders.reduce((s, o) => {
@@ -3360,7 +3421,7 @@ function PaymentLedgerPage() {
 
     const methodHistory = useMemo(() => {
         const byMethod = {};
-        PAYMENT_METHODS.forEach(m => { byMethod[m] = []; });
+        getPaymentMethodNames().forEach(m => { byMethod[m] = []; });
         ledgerEntries
             .slice()
             .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -3403,7 +3464,7 @@ function PaymentLedgerPage() {
         <div style={{ padding: 24 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Syne',sans-serif" }}>Payment Method Ledger</h2>
-                {PAYMENT_METHODS.map(method => (
+                {getPaymentMethodNames().map(method => (
                     <button key={method} onClick={() => setSelectedMethod(method)}
                         style={{ padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: selectedMethod === method ? "linear-gradient(135deg,#3b82f6,#8b5cf6)" : "#1e293b", color: selectedMethod === method ? "#fff" : "#64748b" }}>
                         {method}
@@ -3682,19 +3743,19 @@ function PayrollPage() {
         try {
             const res = await saveSalarySheetEntry(data);
             if (res.success) { await fetchEntries(month); setShowForm(false); setEditEntry(null); }
-            else alert(res.error || "Failed to save entry.");
-        } catch { alert("Network error."); }
+            else toast(res.error || "Failed to save entry.");
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
     async function delEntry(entry) {
         if (!window.confirm(`Delete salary entry for ${entry.salesmanName}?`)) return;
-        try { const res = await deleteSalarySheetEntry(entry.id); if (res.success) await fetchEntries(month); else alert(res.error || "Failed to delete."); }
-        catch { alert("Network error."); }
+        try { const res = await deleteSalarySheetEntry(entry.id); if (res.success) await fetchEntries(month); else toast(res.error || "Failed to delete."); }
+        catch { toast("Network error."); }
     }
     async function reopen(entry) {
         if (!window.confirm(`Reopen ${entry.salesmanName}'s salary? This reverses ALL payments made for it and sets it back to unpaid.`)) return;
-        try { const res = await reopenSalarySheetEntry(entry.id); if (res.success) await fetchEntries(month); else alert(res.error || "Failed."); }
-        catch { alert("Network error."); }
+        try { const res = await reopenSalarySheetEntry(entry.id); if (res.success) await fetchEntries(month); else toast(res.error || "Failed."); }
+        catch { toast("Network error."); }
     }
 
     function openPay(entry) {
@@ -3717,14 +3778,14 @@ function PayrollPage() {
             for (const p of parts) {
                 const res = await paySalarySheetEntry({ id: payTarget.id, amount: p.amt, paymentMethod: p.method });
                 if (!res.success) {
-                    if (String(res.error || "").includes("Unknown")) alert("Salary payment needs the updated backend. Please re-deploy the Google Apps Script (see REDEPLOY.md).");
-                    else alert(res.error || `Failed to record payment via ${p.method}.`);
+                    if (String(res.error || "").includes("Unknown")) toast("Salary payment needs the updated backend. Please re-deploy the Google Apps Script (see REDEPLOY.md).");
+                    else toast(res.error || `Failed to record payment via ${p.method}.`);
                     break;
                 }
             }
             await fetchEntries(month);
             setPayTarget(null);
-        } catch { alert("Network error."); }
+        } catch { toast("Network error."); }
         finally { if (mountedRef.current) setSaving(false); }
     }
 
@@ -4099,6 +4160,7 @@ export default function DukandarApp() {
 
     return (
         <AppContext.Provider value={{ user, isOnline }}>
+            <ToastHost />
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
                 * { box-sizing: border-box; margin: 0; padding: 0; }
