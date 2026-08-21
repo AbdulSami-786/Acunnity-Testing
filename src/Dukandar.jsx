@@ -22,6 +22,7 @@ import {
     updateOrderStitchStatus,
     getCustomers, addCustomer, updateCustomer, deleteCustomer,
     getSuppliers, addSupplier, updateSupplier, deleteSupplier,
+    addSupplierPayment, getSupplierLedger, createSupplierReturn,
     getInventory, addInventory, updateInventory, deleteInventory,
     getExpenses, addExpense, updateExpense, deleteExpense,
     getSalesmen, addSalesman, updateSalesman, deleteSalesman, addSalesmanPayment,
@@ -371,10 +372,8 @@ function LoginPage({ onLogin }) {
             <div style={{ width: "100%", maxWidth: 400, padding: "0 20px" }}>
                 <div style={{ textAlign: "center", marginBottom: 40 }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <div style={{ width: 44, height: 44, background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <span style={{ color: "#fff", fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>د</span>
-                        </div>
-                        <span style={{ color: "#fff", fontSize: 28, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Accunity ASW</span>
+                        <img src="/logo.jpg" alt="Acunnity ASW" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover" }} />
+                        <span style={{ color: "#fff", fontSize: 28, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Acunnity ASW</span>
                     </div>
                     <p style={{ color: "#94a3b8", fontSize: 14 }}>ERP & Business Management</p>
                 </div>
@@ -428,10 +427,8 @@ function Sidebar({ page, setPage, collapsed, setCollapsed }) {
     return (
         <div style={{ width: collapsed ? 64 : 220, minHeight: "100vh", background: "#0f172a", borderRight: "1px solid #1e293b", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "relative", zIndex: 10 }}>
             <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 34, height: 34, background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <span style={{ color: "#fff", fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>د</span>
-                </div>
-                {!collapsed && <span style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Dukandar</span>}
+                <img src="/logo.jpg" alt="Acunnity ASW" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+                {!collapsed && <span style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Acunnity ASW</span>}
             </div>
             <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
                 {NAV_ITEMS.map(item => {
@@ -1192,7 +1189,7 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
                 }
             }
             setShowPayForm(false);
-            setNewPayments({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
+            setNewPayments(Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])));
             onPaymentAdded();
         } catch { toast("Network error."); }
         finally { setSaving(false); }
@@ -1303,7 +1300,7 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
                             <MultiPaymentInput payments={newPayments} onChange={setNewPayments} maxTotal={due} label="Collect Payment" />
                             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                                 <Btn onClick={addPayment} disabled={saving || newPayTotal <= 0} variant="success" size="sm">{saving ? "Saving…" : `Collect ${fmt(newPayTotal)}`}</Btn>
-                                <Btn variant="ghost" size="sm" onClick={() => { setShowPayForm(false); setNewPayments({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" }); }}>Cancel</Btn>
+                                <Btn variant="ghost" size="sm" onClick={() => { setShowPayForm(false); setNewPayments(Object.fromEntries(getPaymentMethodNames().map(m => [m, ""]))); }}>Cancel</Btn>
                             </div>
                         </div>
                     )}
@@ -1494,7 +1491,11 @@ function OrdersPage() {
 
         let pmts = {};
         try { pmts = typeof order.payments === "string" ? JSON.parse(order.payments) : (order.payments || {}); } catch { /* malformed payments JSON */ }
-        setPayments({ Cash: pmts.Cash || "", "Bank Account": pmts["Bank Account"] || "", EasyPaisa: pmts.EasyPaisa || "", JazzCash: pmts.JazzCash || "" });
+        // Union today's configured methods with whatever methods this order actually used —
+        // an order paid via a since-renamed/removed method would otherwise have that amount
+        // silently dropped from the edit form (and never resubmitted on save).
+        const pmtKeys = new Set([...getPaymentMethodNames(), ...Object.keys(pmts)]);
+        setPayments(Object.fromEntries([...pmtKeys].map(m => [m, pmts[m] || ""])));
 
         let items = [];
         try { items = typeof order.items === "string" ? JSON.parse(order.items) : (order.items || []); } catch { /* malformed items JSON */ }
@@ -1569,7 +1570,7 @@ function OrdersPage() {
             setLastOrder({ id: orderId, ...orderPayload, cart });
             setShowInvoice(true);
             setCart([]);
-            setPayments({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
+            setPayments(Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])));
             setDiscount(0);
             setSelectedCustomer("Walk-in Customer");
             setSelectedCustomerObj(null);
@@ -1588,7 +1589,7 @@ function OrdersPage() {
         setIsEditMode(false);
         setEditOrderId(null);
         setCart([]);
-        setPayments({ Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" });
+        setPayments(Object.fromEntries(getPaymentMethodNames().map(m => [m, ""])));
         setDiscount(0);
         setSelectedCustomer("Walk-in Customer");
         setSelectedCustomerObj(null);
@@ -1881,8 +1882,18 @@ function SuppliersPage() {
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [viewSup, setViewSup] = useState(null);
+    const [showPayModal, setShowPayModal] = useState(null);
+    const [showReturnModal, setShowReturnModal] = useState(null);
+    const [showLedger, setShowLedger] = useState(null);
+    const [ledgerEntries, setLedgerEntries] = useState([]);
+    const [ledgerLoading, setLedgerLoading] = useState(false);
     const blank = { name: "", phone: "", city: "", category: "" };
     const [form, setForm] = useState(blank);
+    const payBlank = { amount: "", method: "Cash", note: "" };
+    const [payForm, setPayForm] = useState(payBlank);
+    const returnBlank = { productName: "", qty: "", price: "", reason: "" };
+    const [returnForm, setReturnForm] = useState(returnBlank);
     const mountedRef = useRef(true);
     useEffect(() => { mountedRef.current = true; fetchSups(); return () => { mountedRef.current = false; }; }, []);
     async function fetchSups() {
@@ -1910,6 +1921,38 @@ function SuppliersPage() {
             else toast(result.error || "Failed to delete.");
         } catch { toast("Network error."); }
     }
+    async function openLedger(sup) {
+        setShowLedger(sup); setLedgerLoading(true);
+        try {
+            const res = await getSupplierLedger({ supplierId: sup.id });
+            if (res.success) setLedgerEntries(res.entries || []);
+        } catch { /* network error, leave ledger empty */ }
+        finally { setLedgerLoading(false); }
+    }
+    async function payNow() {
+        if (!showPayModal || !(parseFloat(payForm.amount) > 0)) return;
+        setSaving(true);
+        try {
+            const result = await addSupplierPayment({ supplierId: showPayModal.id, supplierName: showPayModal.name, amount: parseFloat(payForm.amount), method: payForm.method, note: payForm.note });
+            if (result.success) { await fetchSups(); setShowPayModal(null); setPayForm(payBlank); }
+            else toast(result.error || "Payment failed.");
+        } catch { toast("Network error."); }
+        finally { if (mountedRef.current) setSaving(false); }
+    }
+    async function submitReturn() {
+        if (!showReturnModal || !returnForm.productName || !(Number(returnForm.qty) > 0) || !(Number(returnForm.price) >= 0)) return;
+        setSaving(true);
+        try {
+            const result = await createSupplierReturn({
+                supplierId: showReturnModal.id, supplierName: showReturnModal.name,
+                items: [{ productName: returnForm.productName, qty: Number(returnForm.qty), price: Number(returnForm.price) }],
+                reason: returnForm.reason,
+            });
+            if (result.success) { await fetchSups(); setShowReturnModal(null); setReturnForm(returnBlank); }
+            else toast(result.error || "Return failed.");
+        } catch { toast("Network error."); }
+        finally { if (mountedRef.current) setSaving(false); }
+    }
     return (
         <div style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
@@ -1919,10 +1962,11 @@ function SuppliersPage() {
             </div>
             <Card>{loading ? <Spinner /> : <Table columns={[
                 { key: "id", label: "ID" }, { key: "name", label: "Supplier Name" }, { key: "phone", label: "Phone" }, { key: "city", label: "City" }, { key: "category", label: "Category" },
-                { key: "balance", label: "Balance", render: v => <span style={{ color: Number(v) < 0 ? "#f87171" : "#4ade80" }}>{fmt(Math.abs(v))}</span> },
+                { key: "balance", label: "Balance", render: v => <span style={{ color: Number(v) < 0 ? "#f87171" : "#4ade80" }}>{fmt(Math.abs(v))}{Number(v) < 0 ? " (owed)" : ""}</span> },
             ]} data={suppliers}
                 onEdit={row => { setForm({ name: row.name || "", phone: row.phone || "", city: row.city || "", category: row.category || "" }); setEditItem(row); setShowForm(true); }}
                 onDelete={del}
+                onView={row => setViewSup(row)}
             />}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Supplier" : "Add Supplier"} onClose={() => setShowForm(false)}>
@@ -1935,6 +1979,100 @@ function SuppliersPage() {
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
                         <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancel</Btn>
                         <Btn onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Btn>
+                    </div>
+                </Modal>
+            )}
+            {viewSup && (
+                <Modal title={`Supplier — ${viewSup.name}`} onClose={() => setViewSup(null)} width={600}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+                        {[
+                            ["Phone", viewSup.phone || "—"],
+                            ["City", viewSup.city || "—"],
+                            ["Category", viewSup.category || "—"],
+                        ].map(([l, v]) => (
+                            <div key={l} style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px" }}>
+                                <div style={{ color: "#64748b", fontSize: 11 }}>{l}</div>
+                                <div style={{ color: "#f1f5f9", fontWeight: 600, fontSize: 13 }}>{v}</div>
+                            </div>
+                        ))}
+                        <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px" }}>
+                            <div style={{ color: "#64748b", fontSize: 11 }}>Balance</div>
+                            <div style={{ color: Number(viewSup.balance) < 0 ? "#f87171" : "#4ade80", fontWeight: 700, fontSize: 14 }}>
+                                {fmt(Math.abs(viewSup.balance))}{Number(viewSup.balance) < 0 ? " (we owe)" : ""}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <Btn variant="warning" icon="money" onClick={() => { setViewSup(null); setShowPayModal(viewSup); }}>Make Payment</Btn>
+                        <Btn variant="ghost" icon="arrowLeft" onClick={() => { setViewSup(null); setShowReturnModal(viewSup); }}>Record Return</Btn>
+                        <Btn variant="ghost" onClick={() => openLedger(viewSup)}>View Ledger</Btn>
+                        <Btn variant="ghost" onClick={() => setViewSup(null)}>Close</Btn>
+                    </div>
+                </Modal>
+            )}
+            {showPayModal && (
+                <Modal title={`Pay Supplier — ${showPayModal.name}`} onClose={() => setShowPayModal(null)} width={460}>
+                    <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                        <div style={{ color: "#64748b", fontSize: 11 }}>Current Balance</div>
+                        <div style={{ color: Number(showPayModal.balance) < 0 ? "#f87171" : "#4ade80", fontWeight: 700, fontSize: 16 }}>
+                            {fmt(Math.abs(showPayModal.balance))}{Number(showPayModal.balance) < 0 ? " (we owe)" : ""}
+                        </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
+                        <Select label="Payment Method" value={payForm.method} onChange={e => setPayForm({ ...payForm, method: e.target.value })} options={getPaymentMethodNames()} />
+                        <Input label="Note" value={payForm.note} onChange={e => setPayForm({ ...payForm, note: e.target.value })} style={{ gridColumn: "1/-1" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                        <Btn variant="ghost" onClick={() => setShowPayModal(null)}>Cancel</Btn>
+                        <Btn onClick={payNow} disabled={saving || !(parseFloat(payForm.amount) > 0)}>{saving ? "Saving…" : "Process Payment"}</Btn>
+                    </div>
+                </Modal>
+            )}
+            {showReturnModal && (
+                <Modal title={`Record Return — ${showReturnModal.name}`} onClose={() => setShowReturnModal(null)} width={460}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <Input label="Product Name" value={returnForm.productName} onChange={e => setReturnForm({ ...returnForm, productName: e.target.value })} required style={{ gridColumn: "1/-1" }} />
+                        <Input label="Quantity" type="number" min="0" value={returnForm.qty} onChange={e => setReturnForm({ ...returnForm, qty: e.target.value })} required />
+                        <Input label="Price per Unit (Rs)" type="number" min="0" value={returnForm.price} onChange={e => setReturnForm({ ...returnForm, price: e.target.value })} required />
+                        <Input label="Reason (optional)" value={returnForm.reason} onChange={e => setReturnForm({ ...returnForm, reason: e.target.value })} style={{ gridColumn: "1/-1" }} />
+                    </div>
+                    <div style={{ marginTop: 12, padding: "8px 12px", background: "#1e3a5f22", border: "1px solid #3b82f644", borderRadius: 8, fontSize: 12, color: "#94a3b8" }}>
+                        Returning stock to the supplier reduces what we owe them (or increases what they owe us) by {fmt(Number(returnForm.qty || 0) * Number(returnForm.price || 0))}.
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                        <Btn variant="ghost" onClick={() => setShowReturnModal(null)}>Cancel</Btn>
+                        <Btn onClick={submitReturn} disabled={saving || !returnForm.productName || !(Number(returnForm.qty) > 0)}>{saving ? "Saving…" : "Record Return"}</Btn>
+                    </div>
+                </Modal>
+            )}
+            {showLedger && (
+                <Modal title={`Ledger — ${showLedger.name}`} onClose={() => setShowLedger(null)} width={720}>
+                    {ledgerLoading ? <Spinner /> :
+                        (
+                            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                    <thead>
+                                        <tr>{["Date", "Type", "Description", "Debit", "Credit"].map(h => <th key={h} style={{ padding: "8px 12px", color: "#64748b", fontWeight: 600, fontSize: 11, textAlign: "left", borderBottom: "1px solid #334155", whiteSpace: "nowrap" }}>{h}</th>)}</tr>
+                                    </thead>
+                                    <tbody>
+                                        {ledgerEntries.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: "#475569" }}>No ledger entries yet</td></tr>}
+                                        {ledgerEntries.map((e, i) => (
+                                            <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
+                                                <td style={{ padding: "8px 12px", color: "#94a3b8" }}>{e.date}</td>
+                                                <td style={{ padding: "8px 12px" }}><Badge label={e.type} color={e.type === "purchase" ? "orange" : e.type === "supplierPayment" ? "blue" : "yellow"} /></td>
+                                                <td style={{ padding: "8px 12px", color: "#cbd5e1", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description}</td>
+                                                <td style={{ padding: "8px 12px", color: "#f87171", fontWeight: 600 }}>{parseFloat(e.debit) > 0 ? fmt(e.debit) : "—"}</td>
+                                                <td style={{ padding: "8px 12px", color: "#4ade80", fontWeight: 600 }}>{parseFloat(e.credit) > 0 ? fmt(e.credit) : "—"}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+                        <Btn variant="warning" onClick={() => { setShowLedger(null); setShowPayModal(showLedger); }}>Make Payment</Btn>
+                        <Btn variant="ghost" onClick={() => setShowLedger(null)}>Close</Btn>
                     </div>
                 </Modal>
             )}
@@ -2126,8 +2264,11 @@ function ExpensesPage() {
     };
     function openEdit(row) {
         const parsed = parsePayments(row.payments) || {};
-        const payments = { Cash: "", "Bank Account": "", EasyPaisa: "", JazzCash: "" };
-        Object.keys(payments).forEach(m => { if (parsed[m] != null) payments[m] = String(parsed[m]); });
+        // Union today's configured methods with whatever method(s) this expense actually
+        // used — an expense recorded via a since-renamed/removed method would otherwise
+        // have that amount silently dropped from the edit form (and never resubmitted).
+        const methodKeys = new Set([...getPaymentMethodNames(), ...Object.keys(parsed)]);
+        const payments = Object.fromEntries([...methodKeys].map(m => [m, parsed[m] != null ? String(parsed[m]) : ""]));
         setForm({ category: row.category || "Rent", amount: row.amount != null ? String(row.amount) : "", payments, note: row.note || "" });
         setEditItem(row);
         setShowForm(true);

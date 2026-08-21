@@ -712,6 +712,7 @@ function updateOrder(data) {
   var paidCol     = findCol(["paid"]);
   var dueCol      = findCol(["due"]);
   var statusCol   = findCol(["status"]);
+  var paymentsCol = findCol(["payments"]);
   var custIdCol   = findCol(["customerId"]);
   var custNameCol = findCol(["customer","customerName"]);
 
@@ -727,6 +728,17 @@ function updateOrder(data) {
     sheet.getRange(rowIndex, paidCol).setValue(newPaid);
     sheet.getRange(rowIndex, dueCol).setValue(newDue);
     sheet.getRange(rowIndex, statusCol).setValue(newStatus);
+
+    // Merge this collection into the order's payments map too (not just the paid total) —
+    // AccountsPage's per-method Money Flow figures and the Bill Receipt read order.payments
+    // directly, so a credit collection that only updated `paid` would be invisible there
+    // even though it's already recorded in the Payments sheet and the Ledger.
+    if (paymentsCol !== -1) {
+      var existingPayments = {};
+      try { existingPayments = JSON.parse(sheet.getRange(rowIndex, paymentsCol).getValue() || "{}"); } catch (e) {}
+      existingPayments[payMethod] = (parseFloat(existingPayments[payMethod]) || 0) + payAmt;
+      sheet.getRange(rowIndex, paymentsCol).setValue(JSON.stringify(existingPayments));
+    }
 
     var paymentsSheet = getSheet(SHEETS.Payments);
     paymentsSheet.appendRow([generateId("PAY"), data.orderId, payMethod, payAmt, today()]);
