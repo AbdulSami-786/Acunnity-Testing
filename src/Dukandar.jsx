@@ -758,7 +758,7 @@ function MultiPaymentInput({ payments, onChange, maxTotal, label = "Payments", m
                     </span>
                 )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {METHODS.map(method => (
                     <div key={method}>
                         <label style={{ color: "#64748b", fontSize: 11, fontWeight: 500, display: "block", marginBottom: 4 }}>{method}</label>
@@ -1155,9 +1155,9 @@ function ProductsPage() {
     }
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "9px 12px", color: "#f1f5f9", fontSize: 13, outline: "none" }} />
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" style={{ flex: 1, minWidth: 160, background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "9px 12px", color: "#f1f5f9", fontSize: 13, outline: "none" }} />
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchProds}>Refresh</Btn>
                 <Btn size="sm" variant="secondary" icon="qrcode" onClick={() => setShowBatchQR(true)}>All QRs</Btn>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Product</Btn>
@@ -1198,7 +1198,7 @@ function ProductsPage() {
             )}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Product" : "Add Product"} onClose={() => setShowForm(false)}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Product Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Category" value={form.category} onChange={f("category")} />
                         <Input label="Brand" value={form.brand} onChange={f("brand")} />
@@ -1269,9 +1269,9 @@ function CustomersPage() {
     }
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers…" style={{ flex: 1, background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "9px 12px", color: "#f1f5f9", fontSize: 13, outline: "none" }} />
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers…" style={{ flex: 1, minWidth: 160, background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "9px 12px", color: "#f1f5f9", fontSize: 13, outline: "none" }} />
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchCusts}>Refresh</Btn>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Customer</Btn>
             </div>
@@ -1283,7 +1283,7 @@ function CustomersPage() {
             ]} data={filtered} onEdit={row => { setForm({ ...row }); setEditItem(row); setShowForm(true); }} onDelete={del} />}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Customer" : "Add Customer"} onClose={() => setShowForm(false)}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Customer Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Phone" value={form.phone} onChange={f("phone")} required />
                         <Input label="City" value={form.city} onChange={f("city")} />
@@ -1355,7 +1355,7 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
 
     return (
         <Modal title={`Order Detail — ${order.id}`} onClose={onClose} width={700}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+            <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
                 {[
                     ["Customer", order.customer || "Walk-in"],
                     ["Date", order.date],
@@ -1402,7 +1402,7 @@ function OrderDetailModal({ order, onClose, onPaymentAdded }) {
                 </div>
             )}
             <h4 style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 10, textTransform: "uppercase" }}>Order Items</h4>
-            <div style={{ background: "#0f172a", borderRadius: 8, padding: 12, marginBottom: 20 }}>
+            <div className="responsive-table-wrap" style={{ background: "#0f172a", borderRadius: 8, padding: 12, marginBottom: 20 }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                         <tr>{["Product", "Qty", "Price", "Total"].map(h => <th key={h} style={{ padding: "6px 10px", color: "#64748b", fontWeight: 600, fontSize: 11, textAlign: "left", borderBottom: "1px solid #1e293b" }}>{h}</th>)}</tr>
@@ -1479,7 +1479,7 @@ function QuickAddCustomerModal({ onClose, onAdded }) {
 
     return (
         <Modal title="Quick Add Customer" onClose={onClose} width={440}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Input label="Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                 <Input label="Phone" value={form.phone} onChange={f("phone")} required />
                 <Input label="City" value={form.city} onChange={f("city")} />
@@ -1497,6 +1497,7 @@ function QuickAddCustomerModal({ onClose, onAdded }) {
 // ORDERS PAGE
 // ─────────────────────────────────────────────
 function OrdersPage() {
+    const isMobile = useIsMobile();
     const [view, setView] = useState("list");
     const [orders, setOrders] = useState([]);
     const [allProducts, setAllProducts] = useState([]);
@@ -1776,7 +1777,7 @@ function OrdersPage() {
 
     if (view === "new") {
         return (
-            <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 380px", gap: 16, alignItems: "start" }}>
+            <div className="responsive-grid page-padding" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 380px", gap: 16, alignItems: "start" }}>
                 <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                         <Btn variant="ghost" size="sm" icon="arrowLeft" onClick={() => { if (isEditMode) cancelEdit(); else setView("list"); }}>
@@ -1808,7 +1809,7 @@ function OrdersPage() {
                                 options={[{ value: "", label: "— No Stitcher —" }, ...allStitchers.map(s => ({ value: s.name, label: s.name }))]} />
                         </div>
                         {selectedStitcher && (
-                            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div className="responsive-grid" style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                                 <div>
                                     <label style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500, display: "block", marginBottom: 5 }}>Client Stitching Charge (to customer)</label>
                                     <input type="number" value={clientStitchingCharge} onChange={e => { const v = e.target.value; if (v === "" || parseFloat(v) >= 0) setClientStitchingCharge(v); }} min="0" placeholder="Rs"
@@ -1869,9 +1870,9 @@ function OrdersPage() {
                                                     <td style={{ padding: "8px 10px", color: "#f1f5f9" }}>{item.name}</td>
                                                     <td style={{ padding: "8px 10px" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                            <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: 24, height: 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer" }}>-</button>
+                                                            <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: isMobile ? 32 : 24, height: isMobile ? 32 : 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer", flexShrink: 0 }}>-</button>
                                                             <span style={{ color: overStock ? "#f87171" : "#f1f5f9", minWidth: 20, textAlign: "center", fontWeight: overStock ? 700 : 400 }}>{item.qty}</span>
-                                                            <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: 24, height: 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer" }}>+</button>
+                                                            <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: isMobile ? 32 : 24, height: isMobile ? 32 : 24, borderRadius: 6, background: "#334155", border: "none", color: "#f1f5f9", cursor: "pointer", flexShrink: 0 }}>+</button>
                                                         </div>
                                                         {overStock && <div style={{ color: "#f87171", fontSize: 10, marginTop: 2, whiteSpace: "nowrap" }}>Only {item.stock} in stock</div>}
                                                     </td>
@@ -1962,7 +1963,7 @@ function OrdersPage() {
     }
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 20 }}>
                 <StatCard label="Today's Sales" value={fmt(todaySales)} icon="trending" color="green" sub={`${todayCount} orders — ${todayStr}`} />
                 <StatCard label="Filtered Orders" value={fmtNum(filteredOrders.length)} icon="orders" color="blue" sub={startDate || endDate ? `${startDate || "…"} to ${endDate || "…"}` : "All time"} />
@@ -2098,8 +2099,8 @@ function SuppliersPage() {
         finally { if (mountedRef.current) setSaving(false); }
     }
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0 }}>Suppliers</h2>
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchSups}>Refresh</Btn>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Supplier</Btn>
@@ -2114,7 +2115,7 @@ function SuppliersPage() {
             />}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Supplier" : "Add Supplier"} onClose={() => setShowForm(false)}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Supplier Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Phone" value={form.phone} onChange={f("phone")} />
                         <Input label="City" value={form.city} onChange={f("city")} />
@@ -2128,7 +2129,7 @@ function SuppliersPage() {
             )}
             {viewSup && (
                 <Modal title={`Supplier — ${viewSup.name}`} onClose={() => setViewSup(null)} width={600}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
                         {[
                             ["Phone", viewSup.phone || "—"],
                             ["City", viewSup.city || "—"],
@@ -2162,7 +2163,7 @@ function SuppliersPage() {
                             {fmt(Math.abs(showPayModal.balance))}{Number(showPayModal.balance) < 0 ? " (we owe)" : ""}
                         </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
                         <Select label="Payment Method" value={payForm.method} onChange={e => setPayForm({ ...payForm, method: e.target.value })} options={getPaymentMethodNames()} />
                         <Input label="Note" value={payForm.note} onChange={e => setPayForm({ ...payForm, note: e.target.value })} style={{ gridColumn: "1/-1" }} />
@@ -2175,7 +2176,7 @@ function SuppliersPage() {
             )}
             {showReturnModal && (
                 <Modal title={`Record Return — ${showReturnModal.name}`} onClose={() => setShowReturnModal(null)} width={460}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Product Name" value={returnForm.productName} onChange={e => setReturnForm({ ...returnForm, productName: e.target.value })} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Quantity" type="number" min="0" value={returnForm.qty} onChange={e => setReturnForm({ ...returnForm, qty: e.target.value })} required />
                         <Input label="Price per Unit (Rs)" type="number" min="0" value={returnForm.price} onChange={e => setReturnForm({ ...returnForm, price: e.target.value })} required />
@@ -2194,7 +2195,7 @@ function SuppliersPage() {
                 <Modal title={`Ledger — ${showLedger.name}`} onClose={() => setShowLedger(null)} width={720}>
                     {ledgerLoading ? <Spinner /> :
                         (
-                            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                            <div className="responsive-table-wrap" style={{ maxHeight: 400, overflowY: "auto" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                                     <thead>
                                         <tr>{["Date", "Type", "Description", "Debit", "Credit"].map(h => <th key={h} style={{ padding: "8px 12px", color: "#64748b", fontWeight: 600, fontSize: 11, textAlign: "left", borderBottom: "1px solid #334155", whiteSpace: "nowrap" }}>{h}</th>)}</tr>
@@ -2310,8 +2311,8 @@ function InventoryPage() {
         setShowForm(true);
     }
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0 }}>Inventory / Stock In</h2>
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchAll}>Refresh</Btn>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Inventory</Btn>
@@ -2335,7 +2336,7 @@ function InventoryPage() {
             />}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Inventory" : "Add Inventory"} onClose={() => setShowForm(false)}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Select label="Supplier" value={form.supplierId} onChange={e => { const s = allSuppliers.find(x => x.id === e.target.value); setForm({ ...form, supplierId: e.target.value, supplier: s?.name || "" }); }} style={{ gridColumn: "1/-1" }}
                             options={[{ value: "", label: "Select Supplier" }, ...allSuppliers.map(s => ({ value: s.id, label: s.name }))]} />
                         <Select label="Product" value={form.productId} onChange={e => { const p = allProducts.find(x => x.id === e.target.value); setForm({ ...form, productId: e.target.value, product: p?.name || "", purchasePrice: p?.purchasePrice || "" }); }} style={{ gridColumn: "1/-1" }}
@@ -2418,8 +2419,8 @@ function ExpensesPage() {
         setShowForm(true);
     }
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0 }}>Expenses</h2>
                 <div style={{ background: "#450a0a22", border: "1px solid #ef444444", borderRadius: 8, padding: "6px 14px", color: "#f87171", fontSize: 13, fontWeight: 600 }}>Total: {fmt(total)}</div>
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchExp}>Refresh</Btn>
@@ -2444,7 +2445,7 @@ function ExpensesPage() {
             />}</Card>
             {showForm && (
                 <Modal title={editItem ? "Edit Expense" : "Add Expense"} onClose={() => setShowForm(false)}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                         <Select label="Category" value={form.category} onChange={f("category")} options={["Salary", "Rent", "Fuel", "Electricity", "Internet", "Marketing", "Maintenance", "Other"]} />
                         <Input label="Total Amount (or auto from payments)" type="number" value={form.amount} onChange={f("amount")} placeholder={`Auto: ${payTotal}`} />
                         <Input label="Note" value={form.note} onChange={f("note")} style={{ gridColumn: "1/-1" }} />
@@ -2533,8 +2534,8 @@ function SalesmenPage() {
     const getSmOrders = (sm) => orders.filter(o => o.salesman === sm.name || o.salesmanId === sm.id);
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0 }}>Salesmen</h2>
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchAll}>Refresh</Btn>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Salesman</Btn>
@@ -2566,7 +2567,7 @@ function SalesmenPage() {
             {/* Salesman Form Modal */}
             {showForm && (
                 <Modal title={editItem ? "Edit Salesman" : "Add Salesman"} onClose={() => setShowForm(false)} width={600}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Full Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Phone" value={form.phone} onChange={f("phone")} />
                         <Input label="City" value={form.city} onChange={f("city")} />
@@ -2587,7 +2588,7 @@ function SalesmenPage() {
             {/* View Salesman Modal */}
             {viewSM && (
                 <Modal title={`Salesman — ${viewSM.name}`} onClose={() => setViewSM(null)} width={700}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
                         {[
                             ["Phone", viewSM.phone || "—"],
                             ["City", viewSM.city || "—"],
@@ -2618,7 +2619,7 @@ function SalesmenPage() {
             {/* Pay Salesman Modal */}
             {showPayModal && (
                 <Modal title={`Pay — ${showPayModal.name}`} onClose={() => setShowPayModal(null)} width={480}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Select label="Payment Type" value={payForm.type} onChange={e => setPayForm({ ...payForm, type: e.target.value })} options={[{ value: "salary", label: "Salary" }, { value: "commission", label: "Commission" }, { value: "bonus", label: "Bonus" }, { value: "advance", label: "Advance" }]} />
                         <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
                         <Input label="Month" type="month" value={payForm.month} onChange={e => setPayForm({ ...payForm, month: e.target.value })} />
@@ -2733,7 +2734,7 @@ function StitchersPage() {
     const ds = dashboardStats;
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
                 {[
                     { id: "dashboard", label: "Dashboard" },
@@ -2908,7 +2909,7 @@ function StitchersPage() {
                 )}
             {showForm && (
                 <Modal title={editItem ? "Edit Stitcher" : "Add Stitcher"} onClose={() => setShowForm(false)} width={600}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Full Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Input label="Phone" value={form.phone} onChange={f("phone")} />
                         <Input label="City" value={form.city} onChange={f("city")} />
@@ -2925,7 +2926,7 @@ function StitchersPage() {
             )}
             {viewSt && (
                 <Modal title={`Stitcher — ${viewSt.name}`} onClose={() => setViewSt(null)} width={700}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
                         {[
                             ["Phone", viewSt.phone || "—"],
                             ["City", viewSt.city || "—"],
@@ -2951,7 +2952,7 @@ function StitchersPage() {
                         { key: "pieces", label: "Pieces" }, { key: "stitcherPay", label: "Stitcher Pay", render: v => fmt(v) },
                         { key: "status", label: "Status", render: v => <Badge label={v} color={v === "completed" ? "green" : "purple"} /> },
                     ]} data={getStOrders(viewSt)} />
-                    <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                    <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
                         <Btn variant="warning" icon="money" onClick={() => { setViewSt(null); setShowPayModal(viewSt); }}>Make Payment</Btn>
                         <Btn variant="ghost" onClick={() => openLedger(viewSt)}>View Ledger</Btn>
                         <Btn variant="ghost" icon="edit" onClick={() => { setForm({ ...viewSt }); setEditItem(viewSt); setViewSt(null); setShowForm(true); }}>Edit</Btn>
@@ -2962,7 +2963,7 @@ function StitchersPage() {
             {showPayModal && (
                 <Modal title={`Payment — ${showPayModal.name}`} onClose={() => setShowPayModal(null)} width={500}>
                     <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                        <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                             {[
                                 ["Earnings", fmt(showPayModal.totalEarnings)],
                                 ["Paid", fmt(showPayModal.totalPaid)],
@@ -2975,7 +2976,7 @@ function StitchersPage() {
                             ))}
                         </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Amount (Rs)" type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })} required />
                         <Input label="Month" type="month" value={payForm.month} onChange={e => setPayForm({ ...payForm, month: e.target.value })} />
                         <Select label="Payment Method" value={payForm.paymentMethod} onChange={e => setPayForm({ ...payForm, paymentMethod: e.target.value })} options={getPaymentMethodNames()} />
@@ -2989,7 +2990,7 @@ function StitchersPage() {
             )}
             {showLedger && (
                 <Modal title={`Ledger — ${showLedger.name}`} onClose={() => setShowLedger(null)} width={720}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
                         {[
                             ["Total Earnings", fmt(showLedger.totalEarnings), "#4ade80"],
                             ["Total Paid", fmt(showLedger.totalPaid), "#60a5fa"],
@@ -3003,7 +3004,7 @@ function StitchersPage() {
                     </div>
                     {ledgerLoading ? <Spinner /> :
                         (
-                            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                            <div className="responsive-table-wrap" style={{ maxHeight: 400, overflowY: "auto" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                                     <thead>
                                         <tr>{["Date", "Type", "Description", "Debit", "Credit"].map(h => <th key={h} style={{ padding: "8px 12px", color: "#64748b", fontWeight: 600, fontSize: 11, textAlign: "left", borderBottom: "1px solid #334155", whiteSpace: "nowrap" }}>{h}</th>)}</tr>
@@ -3090,8 +3091,8 @@ function AssetsPage() {
     const totalValue = assets.reduce((s, a) => s + Number(a.currentValue || a.purchasePrice || 0), 0);
     const totalCost = assets.reduce((s, a) => s + Number(a.purchasePrice || 0), 0);
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
                 {["list", "summary"].map(t => (
                     <button key={t} onClick={() => setTab(t)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: tab === t ? "linear-gradient(135deg,#3b82f6,#8b5cf6)" : "#1e293b", color: tab === t ? "#fff" : "#64748b" }}>
                         {t === "list" ? "Assets" : "Summary"}
@@ -3131,7 +3132,7 @@ function AssetsPage() {
                 )}
             {showForm && (
                 <Modal title={editItem ? "Edit Asset" : "Add Asset"} onClose={() => setShowForm(false)} width={640}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Asset Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} />
                         <Select label="Category" value={form.category} onChange={f("category")} options={["Equipment", "Vehicle", "Furniture", "Electronics", "Building", "Land", "Software", "Other"]} />
                         <Input label="Location" value={form.location} onChange={f("location")} />
@@ -3152,7 +3153,7 @@ function AssetsPage() {
             )}
             {viewAsset && (
                 <Modal title={`Asset — ${viewAsset.name}`} onClose={() => setViewAsset(null)} width={600}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
                         {[
                             ["Category", viewAsset.category],
                             ["Location", viewAsset.location || "—"],
@@ -3167,7 +3168,7 @@ function AssetsPage() {
                             </div>
                         ))}
                     </div>
-                    <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <Btn icon="tool" variant="warning" onClick={() => { setViewAsset(null); setShowMaintForm(viewAsset); }}>Add Maintenance</Btn>
                         <Btn variant="ghost" onClick={() => { setForm({ ...viewAsset }); setEditItem(viewAsset); setViewAsset(null); setShowForm(true); }} icon="edit">Edit</Btn>
                         <Btn variant="ghost" onClick={() => setViewAsset(null)}>Close</Btn>
@@ -3176,7 +3177,7 @@ function AssetsPage() {
             )}
             {showMaintForm && (
                 <Modal title={`Maintenance — ${showMaintForm.name}`} onClose={() => setShowMaintForm(null)} width={480}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Select label="Type" value={mForm.type} onChange={mf("type")} options={["Repair", "Service", "Inspection", "Replacement", "Upgrade"]} />
                         <Input label="Cost (Rs)" type="number" value={mForm.cost} onChange={mf("cost")} />
                         <Input label="Vendor" value={mForm.vendor} onChange={mf("vendor")} />
@@ -3270,7 +3271,7 @@ function ReportsPage() {
     const tabs = [{ id: "sales", label: "Sales" }, { id: "salesmen", label: "Salesman" }, { id: "stitchers", label: "Stitchers" }, { id: "products", label: "Products" }, { id: "customers", label: "Customers" }, { id: "profit", label: "Profit & Loss" }];
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                 {tabs.map(t => (
                     <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: tab === t.id ? "linear-gradient(135deg,#3b82f6,#8b5cf6)" : "#1e293b", color: tab === t.id ? "#fff" : "#64748b" }}>
@@ -3363,7 +3364,7 @@ function ReportsPage() {
                                         const stitchRevenue = stitchOrders.reduce((s, o) => s + (parseFloat(o.clientStitchingCharge) || 0), 0);
                                         const stitchExpense = stitchOrders.reduce((s, o) => s + (parseFloat(o.stitcherPay) || 0), 0);
                                         return (
-                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                                            <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                                                 {[
                                                     ["Stitched Orders", stitchOrders.length, "#c084fc"],
                                                     ["Client Charge Revenue", fmt(stitchRevenue), "#60a5fa"],
@@ -3401,7 +3402,7 @@ function ReportsPage() {
                                     <StatCard label="Gross Profit" value={fmt(grossProfit)} icon="reports" color={grossProfit >= 0 ? "green" : "red"} sub="Revenue - COGS" />
                                     <StatCard label="Net Profit" value={fmt(netProfit)} icon="money" color={netProfit >= 0 ? "cyan" : "red"} sub="Gross - Expenses" />
                                 </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                     <Card>
                                         <h3 style={{ color: "#4ade80", fontWeight: 700, fontSize: 14, marginBottom: 14 }}>Income</h3>
                                         {[
@@ -3532,8 +3533,8 @@ function AccountsPage() {
     const tabs = [{ id: "balance", label: "Balance Sheet" }, { id: "ledger", label: "Ledger" }, { id: "moneyflow", label: "Money Flow" }];
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                 {tabs.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: tab === t.id ? "linear-gradient(135deg,#3b82f6,#8b5cf6)" : "#1e293b", color: tab === t.id ? "#fff" : "#64748b" }}>{t.label}</button>)}
                 <div style={{ flex: 1 }} />
                 <Btn size="sm" variant="ghost" icon="refresh" onClick={fetchAll}>Refresh</Btn>
@@ -3552,7 +3553,7 @@ function AccountsPage() {
                                     <StatCard label="Credit Receivable" value={fmt(creditReceivable)} icon="alert" color="yellow" />
                                     <StatCard label="Total Expenses" value={fmt(totalExpenses)} icon="expenses" color="red" />
                                 </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                     <Card>
                                         <h3 style={{ color: "#4ade80", fontWeight: 700, fontSize: 14, marginBottom: 14, fontFamily: "'Syne',sans-serif" }}>Assets</h3>
                                         {[
@@ -3746,7 +3747,7 @@ function PaymentLedgerPage() {
     const totalCredit = entries.reduce((s, e) => s + (e.credit || 0), 0);
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Syne',sans-serif" }}>Payment Method Ledger</h2>
                 {getPaymentMethodNames().map(method => (
@@ -3773,7 +3774,7 @@ function PaymentLedgerPage() {
 
                     <Card>
                         <h3 style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 16, textTransform: "uppercase" }}>Ledger Entries for {selectedMethod}</h3>
-                        <div style={{ maxHeight: 500, overflowY: "auto" }}>
+                        <div className="responsive-table-wrap" style={{ maxHeight: 500, overflowY: "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                                 <thead>
                                     <tr>{["Date & Time", "Supplier/Reference", "Description", "Debit", "Credit", "Balance"].map(h => <th key={h} style={{ padding: "8px 12px", color: "#64748b", fontWeight: 600, fontSize: 11, textAlign: "left", borderBottom: "1px solid #334155", whiteSpace: "nowrap" }}>{h}</th>)}</tr>
@@ -3839,8 +3840,8 @@ function PaymentMethodsPage() {
     const typeColors = { Cash: "green", Bank: "blue", EasyPaisa: "purple", JazzCash: "orange", Other: "cyan" };
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
                 <h2 style={{ flex: 1, color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Syne',sans-serif" }}>Payment Methods</h2>
                 <Btn onClick={() => { setForm(blank); setEditItem(null); setShowForm(true); }} icon="plus">Add Method</Btn>
             </div>
@@ -3875,7 +3876,7 @@ function PaymentMethodsPage() {
 
             {showForm && (
                 <Modal title={editItem ? "Edit Payment Method" : "Add Payment Method"} onClose={() => { setShowForm(false); setEditItem(null); }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                         <Input label="Method Name" value={form.name} onChange={f("name")} required style={{ gridColumn: "1/-1" }} placeholder="e.g. HBL Bank, Cash Drawer" />
                         <Select label="Type" value={form.type} onChange={f("type")} options={["Cash", "Bank", "EasyPaisa", "JazzCash", "Other"]} />
                         <Select label="Color" value={form.color} onChange={f("color")} options={[{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "purple", label: "Purple" }, { value: "orange", label: "Orange" }, { value: "cyan", label: "Cyan" }]} />
@@ -3907,7 +3908,7 @@ function SettingsPage({ user }) {
     }
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ maxWidth: 600 }}>
                 <Card style={{ marginBottom: 16 }}>
                     <h3 style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14, marginBottom: 16, fontFamily: "'Syne',sans-serif" }}>Store Settings</h3>
@@ -4098,7 +4099,7 @@ function PayrollPage() {
     const td = { padding: "8px 10px", color: "#cbd5e1", whiteSpace: "nowrap" };
 
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
                 <h2 style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 16, margin: 0, fontFamily: "'Syne',sans-serif" }}>Payroll — Salary Sheet</h2>
                 <div>
@@ -4181,7 +4182,7 @@ function PayrollPage() {
             {/* Partial Pay modal — shows what we owe vs what we're paying now, from a chosen account */}
             {payTarget && (
                 <Modal title={`Pay Salary — ${payTarget.salesmanName}`} onClose={() => setPayTarget(null)} width={460}>
-                    <div style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                    <div className="responsive-grid" style={{ background: "#0f172a", borderRadius: 10, padding: 14, marginBottom: 16, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                         {[
                             ["Net Payable (owe)", fmt(Number(payTarget.netPayable) || 0), "#f1f5f9"],
                             ["Already Paid", fmt(Number(payTarget.paidAmount) || 0), "#4ade80"],
@@ -4215,7 +4216,7 @@ function PayrollPage() {
             {/* Add / Edit salary entry */}
             {showForm && (
                 <Modal title={editEntry ? "Edit Salary Entry" : "Add Salary Entry"} onClose={() => setShowForm(false)} width={720}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                         <Select
                             label="Employee"
                             value={entryForm.salesmanId}
@@ -4327,7 +4328,7 @@ function DashboardPage() {
 
     if (loading) return <Spinner />;
     return (
-        <div style={{ padding: 24 }}>
+        <div className="page-padding" style={{ padding: 24 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 20 }}>
                 <StatCard label="Today Sales" value={fmt(todaySales)} icon="trending" color="green" sub={todayStr} />
                 <StatCard label="Monthly Sales" value={fmt(monthlySales)} icon="reports" color="blue" sub={monthStr} />
@@ -4336,7 +4337,7 @@ function DashboardPage() {
                 {stitcherStats && <StatCard label="Active Stitchers" value={fmtNum(stitcherStats.activeStitchers)} icon="scissors" color="purple" sub={`${stitcherStats.pendingOrders} pending`} />}
                 {stitcherStats && <StatCard label="Stitch Outstanding" value={fmt(stitcherStats.totalBalance)} icon="money" color="orange" sub="Payable to stitchers" />}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                 <Card>
                     <h3 style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14, marginBottom: 16, fontFamily: "'Syne',sans-serif" }}>Last 7 Days Sales</h3>
                     <MiniChart data={last7} />
