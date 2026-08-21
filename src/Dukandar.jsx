@@ -41,6 +41,25 @@ const AppContext = createContext(null);
 function useApp() { return useContext(AppContext); }
 
 // ─────────────────────────────────────────────
+// RESPONSIVE BREAKPOINT
+// Below 768px the shell switches from a fixed sidebar to a slide-out drawer + bottom tab
+// bar, and pages switch multi-column grids to a single stacked column. Kept as one hook so
+// every component branches on the same threshold as the CSS media queries below.
+// ─────────────────────────────────────────────
+const MOBILE_BREAKPOINT = 768;
+function useIsMobile() {
+    const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT);
+    useEffect(() => {
+        const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+        const onChange = () => setIsMobile(mq.matches);
+        onChange();
+        mq.addEventListener("change", onChange);
+        return () => mq.removeEventListener("change", onChange);
+    }, []);
+    return isMobile;
+}
+
+// ─────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // Module-level pub/sub so any component can call toast(...) directly,
 // the same way it would call the browser's alert(...), without prop drilling or context.
@@ -216,7 +235,7 @@ function Spinner() {
     return (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 48, gap: 10, color: "#475569", fontSize: 13 }}>
             <Icon name="refresh" size={16} className="spin" />
-            Loading from Google Sheet…
+            Loading…
             <style>{`@keyframes spin { to { transform: rotate(360deg); } } .spin { animation: spin 0.8s linear infinite; }`}</style>
         </div>
     );
@@ -262,7 +281,7 @@ function DateRangeFilter({ startDate, endDate, onStartChange, onEndChange, onCle
 // ─────────────────────────────────────────────
 // GLOBAL SEARCH COMPONENT
 // ─────────────────────────────────────────────
-function GlobalSearchBar({ onNavigate }) {
+function GlobalSearchBar({ onNavigate, mobileFullScreen, onCloseMobile }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -298,22 +317,15 @@ function GlobalSearchBar({ onNavigate }) {
         return () => clearTimeout(timer);
     }, [query, searchAll]);
 
-    return (
-        <div ref={ref} style={{ position: "relative", flex: 1, maxWidth: 400 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#1e293b", border: "1px solid #334155", borderRadius: 9, padding: "7px 12px" }}>
-                <Icon name="search" size={14} style={{ color: "#64748b", flexShrink: 0 }} />
-                <input value={query} onChange={e => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
-                    placeholder="Search products, customers, orders…"
-                    style={{ background: "none", border: "none", outline: "none", color: "#f1f5f9", fontSize: 13, width: "100%", fontFamily: "'DM Sans',sans-serif" }} />
-                {loading && <Icon name="refresh" size={13} className="spin" style={{ color: "#64748b" }} />}
-            </div>
-            {open && results.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 10, zIndex: 9999, overflow: "hidden", boxShadow: "0 8px 32px #00000066" }}>
+    const resultsList = (
+        <>
+            {results.length > 0 && (
+                <div style={mobileFullScreen ? { marginTop: 12 } : { position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 10, zIndex: 9999, overflow: "hidden", boxShadow: "0 8px 32px #00000066" }}>
                     {results.map((r, i) => (
-                        <div key={i} onClick={() => { onNavigate(r.page); setQuery(""); setOpen(false); }}
-                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #0f172a" }}
+                        <div key={i} onClick={() => { onNavigate(r.page); setQuery(""); setOpen(false); onCloseMobile?.(); }}
+                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer", borderBottom: "1px solid #0f172a", borderRadius: mobileFullScreen ? 10 : 0, background: mobileFullScreen ? "#1e293b" : "transparent", marginBottom: mobileFullScreen ? 6 : 0 }}
                             onMouseEnter={e => e.currentTarget.style.background = "#334155"}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            onMouseLeave={e => e.currentTarget.style.background = mobileFullScreen ? "#1e293b" : "transparent"}>
                             <div style={{ width: 30, height: 30, borderRadius: 7, background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                 <Icon name={r.icon} size={14} style={{ color: "#64748b" }} />
                             </div>
@@ -326,11 +338,44 @@ function GlobalSearchBar({ onNavigate }) {
                     ))}
                 </div>
             )}
-            {open && query.length >= 2 && results.length === 0 && !loading && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 10, zIndex: 9999, padding: "16px", textAlign: "center", color: "#64748b", fontSize: 13 }}>
+            {query.length >= 2 && results.length === 0 && !loading && (
+                <div style={mobileFullScreen ? { marginTop: 12, textAlign: "center", color: "#64748b", fontSize: 13 } : { position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#1e293b", border: "1px solid #334155", borderRadius: 10, zIndex: 9999, padding: "16px", textAlign: "center", color: "#64748b", fontSize: 13 }}>
                     No results for "{query}"
                 </div>
             )}
+        </>
+    );
+
+    if (mobileFullScreen) {
+        return (
+            <div style={{ position: "fixed", inset: 0, background: "#0f172a", zIndex: 60, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, borderBottom: "1px solid #1e293b" }}>
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: "#1e293b", border: "1px solid #334155", borderRadius: 9, padding: "10px 12px" }}>
+                        <Icon name="search" size={14} style={{ color: "#64748b", flexShrink: 0 }} />
+                        <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+                            placeholder="Search products, customers, orders…"
+                            style={{ background: "none", border: "none", outline: "none", color: "#f1f5f9", fontSize: 15, width: "100%", fontFamily: "'DM Sans',sans-serif" }} />
+                        {loading && <Icon name="refresh" size={13} className="spin" style={{ color: "#64748b" }} />}
+                    </div>
+                    <button onClick={onCloseMobile} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 6, flexShrink: 0 }}>
+                        <Icon name="x" size={20} />
+                    </button>
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>{resultsList}</div>
+            </div>
+        );
+    }
+
+    return (
+        <div ref={ref} style={{ position: "relative", flex: 1, maxWidth: 400 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#1e293b", border: "1px solid #334155", borderRadius: 9, padding: "7px 12px" }}>
+                <Icon name="search" size={14} style={{ color: "#64748b", flexShrink: 0 }} />
+                <input value={query} onChange={e => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+                    placeholder="Search products, customers, orders…"
+                    style={{ background: "none", border: "none", outline: "none", color: "#f1f5f9", fontSize: 13, width: "100%", fontFamily: "'DM Sans',sans-serif" }} />
+                {loading && <Icon name="refresh" size={13} className="spin" style={{ color: "#64748b" }} />}
+            </div>
+            {open && resultsList}
         </div>
     );
 }
@@ -423,28 +468,103 @@ const NAV_ITEMS = [
     { id: "settings", label: "Settings", icon: "settings" },
 ];
 
-function Sidebar({ page, setPage, collapsed, setCollapsed }) {
-    return (
-        <div style={{ width: collapsed ? 64 : 220, minHeight: "100vh", background: "#0f172a", borderRight: "1px solid #1e293b", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "relative", zIndex: 10 }}>
+function Sidebar({ page, setPage, collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
+    const isMobile = useIsMobile();
+
+    const navBody = (
+        <>
             <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", gap: 10 }}>
                 <img src="/logo.jpg" alt="Acunnity ASW" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
-                {!collapsed && <span style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Acunnity ASW</span>}
+                {(!collapsed || isMobile) && <span style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif", letterSpacing: "-0.5px" }}>Acunnity ASW</span>}
+                {isMobile && (
+                    <button onClick={() => setMobileOpen(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 4 }}>
+                        <Icon name="x" size={18} />
+                    </button>
+                )}
             </div>
             <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
                 {NAV_ITEMS.map(item => {
                     const active = page === item.id;
                     return (
-                        <button key={item.id} onClick={() => setPage(item.id)} title={collapsed ? item.label : undefined}
-                            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "#1e40af22" : "transparent", color: active ? "#60a5fa" : "#64748b", fontSize: 13, fontWeight: active ? 600 : 400, fontFamily: "'DM Sans',sans-serif", marginBottom: 2, textAlign: "left", transition: "all 0.15s" }}>
+                        <button key={item.id} onClick={() => { setPage(item.id); if (isMobile) setMobileOpen(false); }} title={collapsed && !isMobile ? item.label : undefined}
+                            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 10px", borderRadius: 8, border: "none", cursor: "pointer", background: active ? "#1e40af22" : "transparent", color: active ? "#60a5fa" : "#64748b", fontSize: 13, fontWeight: active ? 600 : 400, fontFamily: "'DM Sans',sans-serif", marginBottom: 2, textAlign: "left", transition: "all 0.15s" }}>
                             <span style={{ flexShrink: 0 }}><Icon name={item.icon} size={17} /></span>
-                            {!collapsed && <span>{item.label}</span>}
+                            {(!collapsed || isMobile) && <span>{item.label}</span>}
                         </button>
                     );
                 })}
             </nav>
-            <button onClick={() => setCollapsed(!collapsed)}
-                style={{ margin: "8px", padding: "9px", borderRadius: 8, background: "#1e293b", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="menu" size={16} />
+            {!isMobile && (
+                <button onClick={() => setCollapsed(!collapsed)}
+                    style={{ margin: "8px", padding: "9px", borderRadius: 8, background: "#1e293b", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="menu" size={16} />
+                </button>
+            )}
+        </>
+    );
+
+    if (isMobile) {
+        return (
+            <>
+                {mobileOpen && (
+                    <div onClick={() => setMobileOpen(false)}
+                        style={{ position: "fixed", inset: 0, background: "#00000099", zIndex: 40, animation: "fadeIn 0.15s" }} />
+                )}
+                <div style={{
+                    position: "fixed", top: 0, left: 0, bottom: 0, width: "min(80vw, 280px)",
+                    background: "#0f172a", borderRight: "1px solid #1e293b", display: "flex", flexDirection: "column",
+                    zIndex: 50, transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
+                    transition: "transform 0.22s ease", boxShadow: mobileOpen ? "4px 0 24px #00000066" : "none",
+                    paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)",
+                }}>
+                    {navBody}
+                </div>
+            </>
+        );
+    }
+
+    return (
+        <div style={{ width: collapsed ? 64 : 220, minHeight: "100vh", background: "#0f172a", borderRight: "1px solid #1e293b", display: "flex", flexDirection: "column", transition: "width 0.2s", flexShrink: 0, position: "relative", zIndex: 10 }}>
+            {navBody}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
+// MOBILE BOTTOM TAB BAR
+// The 16 nav items don't fit a bottom bar — show the 4 highest-traffic pages plus a "More"
+// button that opens the same slide-out drawer used by the hamburger menu, so every page
+// stays one tap away without a cramped 16-icon strip.
+// ─────────────────────────────────────────────
+const BOTTOM_NAV_ITEMS = [
+    { id: "dashboard", label: "Home", icon: "dashboard" },
+    { id: "orders", label: "Orders", icon: "orders" },
+    { id: "products", label: "Products", icon: "products" },
+    { id: "customers", label: "Customers", icon: "customers" },
+];
+
+function MobileBottomNav({ page, setPage, onMore }) {
+    const moreActive = !BOTTOM_NAV_ITEMS.some(i => i.id === page);
+    return (
+        <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 30,
+            background: "#0f172a", borderTop: "1px solid #1e293b",
+            display: "flex", paddingBottom: "env(safe-area-inset-bottom)",
+        }}>
+            {BOTTOM_NAV_ITEMS.map(item => {
+                const active = page === item.id;
+                return (
+                    <button key={item.id} onClick={() => setPage(item.id)}
+                        style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "8px 4px 10px", background: "none", border: "none", color: active ? "#60a5fa" : "#64748b", cursor: "pointer" }}>
+                        <Icon name={item.icon} size={20} />
+                        <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{item.label}</span>
+                    </button>
+                );
+            })}
+            <button onClick={onMore}
+                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "8px 4px 10px", background: "none", border: "none", color: moreActive ? "#60a5fa" : "#64748b", cursor: "pointer" }}>
+                <Icon name="menu" size={20} />
+                <span style={{ fontSize: 10, fontWeight: moreActive ? 700 : 500 }}>More</span>
             </button>
         </div>
     );
@@ -453,31 +573,55 @@ function Sidebar({ page, setPage, collapsed, setCollapsed }) {
 // ─────────────────────────────────────────────
 // TOPBAR
 // ─────────────────────────────────────────────
-function Topbar({ page, user, onLogout, isOnline, onNavigate, pendingCount }) {
+function Topbar({ page, user, onLogout, isOnline, onNavigate, pendingCount, onMenuTap }) {
     const label = NAV_ITEMS.find(n => n.id === page)?.label || "Dashboard";
+    const isMobile = useIsMobile();
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     return (
-        <div style={{ height: 56, background: "#0f172a", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-            <h1 style={{ color: "#f1f5f9", fontSize: 16, fontWeight: 700, fontFamily: "'Syne',sans-serif", margin: 0, whiteSpace: "nowrap" }}>{label}</h1>
-            <GlobalSearchBar onNavigate={onNavigate} />
-            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: isOnline ? "#05250d" : "#2d1010", border: `1px solid ${isOnline ? "#16a34a44" : "#ef444444"}`, flexShrink: 0 }}>
+        <div style={{
+            height: 56, background: "#0f172a", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center",
+            padding: isMobile ? "0 12px" : "0 20px", gap: isMobile ? 8 : 12, flexShrink: 0,
+            paddingTop: "env(safe-area-inset-top)",
+        }}>
+            {isMobile && (
+                <button onClick={onMenuTap} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, flexShrink: 0 }}>
+                    <Icon name="menu" size={20} />
+                </button>
+            )}
+            <h1 style={{ color: "#f1f5f9", fontSize: 16, fontWeight: 700, fontFamily: "'Syne',sans-serif", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</h1>
+            {!isMobile && <GlobalSearchBar onNavigate={onNavigate} />}
+            <div style={{ flex: isMobile ? 1 : undefined }} />
+            {isMobile && (
+                <button onClick={() => setMobileSearchOpen(true)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, flexShrink: 0 }}>
+                    <Icon name="search" size={19} />
+                </button>
+            )}
+            {isMobile && mobileSearchOpen && (
+                <GlobalSearchBar onNavigate={onNavigate} mobileFullScreen onCloseMobile={() => setMobileSearchOpen(false)} />
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: isMobile ? 6 : "4px 10px", borderRadius: 20, background: isOnline ? "#05250d" : "#2d1010", border: `1px solid ${isOnline ? "#16a34a44" : "#ef444444"}`, flexShrink: 0 }}>
                 <Icon name={isOnline ? "wifi" : "wifiOff"} size={13} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: isOnline ? "#4ade80" : "#f87171" }}>{isOnline ? "Online" : "Offline"}</span>
+                {!isMobile && <span style={{ fontSize: 11, fontWeight: 600, color: isOnline ? "#4ade80" : "#f87171" }}>{isOnline ? "Online" : "Offline"}</span>}
             </div>
             {pendingCount > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: "#2d1010", border: "1px solid #f9731644", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: isMobile ? 6 : "4px 10px", borderRadius: 20, background: "#2d1010", border: "1px solid #f9731644", flexShrink: 0 }}>
                     <Icon name="sync" size={13} style={{ color: "#fb923c" }} className="spin" />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "#fb923c" }}>{pendingCount} pending</span>
+                    {!isMobile && <span style={{ fontSize: 11, fontWeight: 600, color: "#fb923c" }}>{pendingCount} pending</span>}
                 </div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{user.name[0]}</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ color: "#f1f5f9", fontSize: 12, fontWeight: 600 }}>{user.name}</span>
-                    <span style={{ color: "#64748b", fontSize: 11 }}>{user.role}</span>
-                </div>
-                <button onClick={onLogout} style={{ marginLeft: 4, width: 30, height: 30, borderRadius: 8, background: "transparent", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {!isMobile && (
+                    <>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <span style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{user.name[0]}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ color: "#f1f5f9", fontSize: 12, fontWeight: 600 }}>{user.name}</span>
+                            <span style={{ color: "#64748b", fontSize: 11 }}>{user.role}</span>
+                        </div>
+                    </>
+                )}
+                <button onClick={onLogout} style={{ marginLeft: isMobile ? 0 : 4, width: 30, height: 30, borderRadius: 8, background: "transparent", border: "none", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Icon name="logout" size={15} />
                 </button>
             </div>
@@ -4252,8 +4396,10 @@ export default function DukandarApp() {
     const [user, setUser] = useState(null);
     const [page, setPage] = useState("dashboard");
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingCount, setPendingCount] = useState(0);
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         const on = async () => {
@@ -4300,26 +4446,44 @@ export default function DukandarApp() {
     };
 
     return (
-        <AppContext.Provider value={{ user, isOnline }}>
+        <AppContext.Provider value={{ user, isOnline, isMobile }}>
             <ToastHost />
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-                * { box-sizing: border-box; margin: 0; padding: 0; }
-                body { background: #0f172a; }
+                * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+                html, body { background: #0f172a; overscroll-behavior-y: contain; }
+                body { -webkit-text-size-adjust: 100%; }
                 ::-webkit-scrollbar { width: 4px; height: 4px; }
                 ::-webkit-scrollbar-track { background: #0f172a; }
                 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
                 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+                input, select, textarea, button { font-size: 16px; }
                 @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 .spin { animation: spin 0.8s linear infinite; }
+
+                /* Responsive helpers used across page components — grids/forms opt in via
+                   className so they collapse to one column and tables scroll instead of
+                   overflowing the viewport on phones. */
+                .responsive-grid { display: grid; gap: 16px; }
+                .responsive-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+                @media (max-width: 767px) {
+                    .responsive-grid { grid-template-columns: 1fr !important; }
+                    .hide-mobile { display: none !important; }
+                    .page-padding { padding: 14px !important; }
+                }
+                @media (min-width: 768px) {
+                    .hide-desktop { display: none !important; }
+                }
             `}</style>
             <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", background: "#0f172a" }}>
-                <Sidebar page={page} setPage={setPage} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+                <Sidebar page={page} setPage={setPage} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} mobileOpen={mobileNavOpen} setMobileOpen={setMobileNavOpen} />
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-                    <Topbar page={page} user={user} onLogout={() => setUser(null)} isOnline={isOnline} onNavigate={setPage} pendingCount={pendingCount} />
-                    <main style={{ flex: 1, overflowY: "auto" }}>
+                    <Topbar page={page} user={user} onLogout={() => setUser(null)} isOnline={isOnline} onNavigate={setPage} pendingCount={pendingCount} onMenuTap={() => setMobileNavOpen(true)} />
+                    <main style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? "calc(56px + env(safe-area-inset-bottom))" : 0 }}>
                         {pages[page] || <DashboardPage />}
                     </main>
+                    {isMobile && <MobileBottomNav page={page} setPage={setPage} onMore={() => setMobileNavOpen(true)} />}
                 </div>
             </div>
         </AppContext.Provider>
